@@ -150,8 +150,8 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
     return target_view
 
-target_view = render_target_view(alphas, rgbs, p_target, poses)
-print(target_view)
+#target_view = render_target_view(alphas, rgbs, p_target, poses)
+#print(target_view)
 
 
 
