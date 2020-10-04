@@ -114,3 +114,46 @@ def back_to_front_alphacomposite(rgba_depth_image):
 
     img = transforms.ToTensor()(img)
     return img
+
+
+# Function to get bilinear interpolation weights for target pose calculation from 4 camera poses (regular grid)
+# Input: target pose x and y; 4 camera poses 
+# Output: weights for bilinear interpolation 
+
+def bilinear_interpolation(x, y, poses):
+
+    poses = sorted(poses)               
+    (x1, y1), (_x1, y2), (x2, _y1), (_x2, _y2) = poses
+
+    w1 = (x2 - x) * (y2 - y) / ((x2 - x1) * (y2 - y1) + 0.0)
+    w2 = (x - x1) * (y2 - y) / ((x2 - x1) * (y2 - y1) + 0.0)
+    w3 = (x2 - x) * (y - y1) / ((x2 - x1) * (y2 - y1) + 0.0)
+    w4 = (x - x1) * (y - y1) / ((x2 - x1) * (y2 - y1) + 0.0)
+
+    return w1, w2, w3, w4
+
+# Function to render target pose using alpha and rgb image and interpolation weights 
+# Input: alpha- and rgb-images (MPI), target pose, camera poses
+# Output: rendered target view
+
+def render_target_view(alphas, rgbs, p_target, poses):
+    
+
+
+    w_t_1, w_t_2, w_t_3, w_t_4 = bilinear_interpolation(p_target[0], p_target[1], poses)
+
+    r = (w_t_1 * torch.mul(alphas[0], rgbs[0,0,:,:]) + w_t_2 * torch.mul(alphas[1], rgbs[1,0,:,:]) + w_t_3 * torch.mul(alphas[2], rgbs[2,0,:,:]) + w_t_4 * torch.mul(alphas[3], rgbs[3,0,:,:])) / (w_t_1*alphas[0] + w_t_2*alphas[1] + w_t_3*alphas[2] + w_t_4*alphas[3])
+    g = (w_t_1 * torch.mul(alphas[0], rgbs[0,1,:,:]) + w_t_2 * torch.mul(alphas[1], rgbs[1,1,:,:]) + w_t_3 * torch.mul(alphas[2], rgbs[2,1,:,:]) + w_t_4 * torch.mul(alphas[3], rgbs[3,1,:,:])) / (w_t_1*alphas[0] + w_t_2*alphas[1] + w_t_3*alphas[2] + w_t_4*alphas[3])
+    b = (w_t_1 * torch.mul(alphas[0], rgbs[0,2,:,:]) + w_t_2 * torch.mul(alphas[1], rgbs[1,2,:,:]) + w_t_3 * torch.mul(alphas[2], rgbs[2,2,:,:]) + w_t_4 * torch.mul(alphas[3], rgbs[3,2,:,:])) / (w_t_1*alphas[0] + w_t_2*alphas[1] + w_t_3*alphas[2] + w_t_4*alphas[3])
+
+    target_view = torch.stack((r,g,b), dim=0)
+
+    return target_view
+
+target_view = render_target_view(alphas, rgbs, p_target, poses)
+print(target_view)
+
+
+
+
+
