@@ -27,7 +27,7 @@ def create_depth_tensor(depth_map, layers):
     #convert to 3d 1-hot-encoding depth_tensor (512,512,layers)
     depth_tensor = (torch.arange(layers) == depth_layers[...,None]).int()
     
-    return depth_layers, depth_tensor 
+    return depth_tensor 
     
     
     
