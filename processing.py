@@ -7,27 +7,66 @@ from torchvision import transforms
 #          Integer layers          
 # Output : (512,512, layers) depth tensor
 
-def create_depth_tensor(depth_map, layers):
+def create_disp_tensor(depth_map, layers):
     assert depth_map.shape == (512,512), 'Depth map needs to be shape (512,512)'
     assert type(layers) == int, 'layers needs to be integer'
-    
-    #get the min_depth and the max_depth
-    min_depth = torch.min(depth_map)
-    max_depth = torch.max(depth_map)*1.000001
-    
-    #shift all depths by the min_depth
-    depth_rel = depth_map-min_depth
-    
+
+	# convert the depth to disparity
+    disp_map = 1/depth_map
+
+    #get the min_disparity and the max_disparity
+    min_disp = torch.min(disp_map)*0.999999
+    max_disp = torch.max(disp_map)*1.000001
+
     #get the bin_size
-    bin_size  = (max_depth-min_depth)/layers
+    bin_size  = max_disp/layers
+    #get the disparity_layer for every pixel
+    disp_layers = layers - 1 - (disp_shifted/bin_size).int()
+
+    #convert to 3d 1-hot-encoding disparity_tensor (512,512,layers)
+    disp_tensor = (torch.arange(layers) == disp_layers[...,None]).int()
     
-    #get the depth_layer for every pixel
-    depth_layers = (depth_rel/bin_size).int()
+    return disp_tensor 
+
+# takes a 9x9 grid of depth_maps and returns a 9x9 grid of disp_tensors
+def create_all_disp_tensors(depth_all_map, layers):
+    assert depth_all_map.shape == (9,9,512,512), 'Depth_all_map needs to be 9x9x512x512'
+    assert type(layers) == int, 'layers needs to be integer'
     
-    #convert to 3d 1-hot-encoding depth_tensor (512,512,layers)
-    depth_tensor = (torch.arange(layers) == depth_layers[...,None]).int()
+    all_disp_tensor = torch.zeros((9,9,512,512,layers))
+    for i in range(9):
+        for j in range(9):
+            all_disp_tensor[i,j] = create_disp_tensor(depth_all_map[i,j],layers)
+    return all_disp_tensor
     
-    return depth_tensor 
+def create_psv(image, disp_tensor):
+    
+    # Input: RGB image 3 x 512 x 512 
+    # Input: Disp tensor 512 x 512 x Depth
+    # Output: PSV 3 x 512 x 512 x Depth
+    
+    assert len(disp_tensor.shape)==3, 'Disp tensor needs to be 512x512xdepth'
+    layers = depth_tensor.shape[2]
+    assert disp_tensor.shape == (512,512,layers), 'Depth tensor needs to be 512x512xdepth'
+
+    assert len(image.shape)==3, 'Image must be 3x512x512'
+    assert image.shape[0]==3, 'Image must be 3x512x512'
+
+    
+    output=torch.zeros((3,512,512,layers))
+    
+    for d in range(layers):
+        output[:,:,:,d] = image*disp_tensor[None, :, :, d]
+                
+    return output
+
+# takes a 9x9 grid of images and disp_tensors and returns a 9x9 grid of PSVs
+def create_all_psv(image_all, disp_tensor_all, layers):
+    all_psv = torch.zeros((9,9,3,512,512,layers))
+    for i in range(9):
+        for j in range(9):
+            all_psv[i,j]=create_psv(image_all[i,j],disp_tensor_all[i,j], layers)
+    return all_psv
     
     
     
@@ -157,3 +196,84 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 
 
+#F(mm) = F(pixels) * SensorWidth(mm) / ImageWidth (pixel).
+
+# homography warp
+# http://campar.in.tum.de/twiki/pub/Chair/TeachingWs10Cv2/3D_CV2_WS_2010_Rectification_Disparity.pdf
+
+# d = f*b / Z
+# 1/Z given
+# b baseline [mm]
+# f focal length [mm]
+
+
+# function to perform the homography warp 
+# inputs:
+# mpi (4x512x512xdepth)
+# input_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
+# output_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
+
+def homography(mpi, input_pos, output_pos):
+  
+    layers = mpi.shape[-1]
+    
+    # Note: camera parameters that needed to be given to the function somehow
+    # baselineMM
+    # focalLength;;
+    # SensorWidthMM
+    # ImageSize 512,512
+    # Disparity Scaling to correct for the real depth
+    baseline_Pixel  = baselineMM*ImageSizePixel / SensorWidthMM
+    focalLengthPixel = focalLengthMM*ImageWidthPixel / SensorWidthMM
+    disparity_factor = focalLengthPixel * baseline_Pixel * disparityScaling
+    
+    camera_xDiff = (input_pos[0]-output_pos[0])
+    camera_yDiff = (input_pos[1]-output_pos[1])
+    
+
+    target_mpi = torch.zeros((4,512,512,layers))
+    
+    if camera_xDiff > 0: 
+        for d in range(layers):
+            disparity = int(d*disparity_factor*abs(camera_xDiff))
+            target_mpi[:,:-disparity,:,d] = mpi[:,disparity:,:,d]
+    if camera_xDiff =< 0: 
+        for d in range(layers):
+            disparity = int(d*disparity_factor*abs(camera_xDiff))
+            target_mpi[:,disparity:,:,d] = mpi[:,:-disparity,:,d]   
+            
+    if camera_yDiff > 0: 
+        for d in range(layers):
+            disparity = int(d*disparity_factor*abs(camera_yDiff))
+            target_mpi[:,:,:-disparity,d] = mpi[:,:,disparity:,d]
+    if camera_yDiff =< 0: 
+        for d in range(layers):
+            disparity = int(d*disparity_factor*abs(camera_yDiff))
+            target_mpi[:,:,disparity:,d] = mpi[:,:,:-disparity,d]
+            
+    return target_mpi
+        
+        
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
