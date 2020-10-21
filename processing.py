@@ -178,7 +178,6 @@ def bilinear_interpolation(x, y, poses):
 def render_target_view(alphas, rgbs, p_target, poses):
     
 
-
     w_t_1, w_t_2, w_t_3, w_t_4 = bilinear_interpolation(p_target[0], p_target[1], poses)
 
     r = (w_t_1 * torch.mul(alphas[0], rgbs[0,0,:,:]) + w_t_2 * torch.mul(alphas[1], rgbs[1,0,:,:]) + w_t_3 * torch.mul(alphas[2], rgbs[2,0,:,:]) + w_t_4 * torch.mul(alphas[3], rgbs[3,0,:,:])) / (w_t_1*alphas[0] + w_t_2*alphas[1] + w_t_3*alphas[2] + w_t_4*alphas[3])
@@ -191,6 +190,28 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 #target_view = render_target_view(alphas, rgbs, p_target, poses)
 #print(target_view)
+
+
+# Function to render target pose using rgba image and interpolation weights; in our simple geometric case within a grid, two crosses and target pose in the middle 
+# Input: alpha- and rgb-images (MPI), target pose, camera poses
+# Output: rendered target view
+
+def blending_images_ourspecialcase(rgba):
+
+    w_t_1 = 0.5
+    w_t_2 = 0.5
+
+    r = (w_t_1 * torch.mul(rgba[0][3], rgba[0][0]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][0])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
+    g = (w_t_1 * torch.mul(rgba[0][3], rgba[0][1]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][1])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
+    b = (w_t_1 * torch.mul(rgba[0][3], rgba[0][2]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][2])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
+
+    target_view = torch.squeeze(torch.stack((r,g,b), dim=0))
+
+    return target_view
+
+
+
+
 
 
 
@@ -237,7 +258,8 @@ def homography(mpi, input_pos, output_pos):
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_xDiff))
             target_mpi[:,:-disparity,:,d] = mpi[:,disparity:,:,d]
-    if camera_xDiff =< 0: 
+
+    if camera_xDiff <= 0: 
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_xDiff))
             target_mpi[:,disparity:,:,d] = mpi[:,:-disparity,:,d]   
@@ -246,7 +268,8 @@ def homography(mpi, input_pos, output_pos):
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,:-disparity,d] = mpi[:,:,disparity:,d]
-    if camera_yDiff =< 0: 
+
+    if camera_yDiff <= 0: 
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,disparity:,d] = mpi[:,:,:-disparity,d]

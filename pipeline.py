@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-
+'''
 def get_psvs(LF, depth_all_map, layers):
     # convert the data to torch tensors
     images = torch.from_numpy(LF).permute([0,1,4,2,3]).float()/255.
@@ -53,7 +53,7 @@ def transform_mpis(rgba):
     alpha  = C_alpha[:,:, 3,:,:]
 
     return rgb, alpha 
-
+'''
 
 def render_image(alpha, rgb, target_pose, input_poses):
 
@@ -67,17 +67,48 @@ def render_image(alpha, rgb, target_pose, input_poses):
     return target_view
 
 
+# Function to get target_image from predicted MPIs by warping and alpha-compositing one image from each MPI in target view and blending them to one final target_image by equation 8 
+# Input: prediced MPIs
+# Output: target view 
+
+def get_target_image(mpis):
+
+    warped_rgba_images = list()
+    
+    # split tensor in single mpis
+    mpis = torch.split(mpis, split_size_or_sections=1, dim=0)
+
+    # for every mpi do back-to-front-alpha-compositing and warping into target perspective
+    for mpi in mpis:
+        
+        composited_image = processing.back_to_front_alphacomposite(torch.squeeze(mpi))
+
+        warped_image = composited_image
+
+        warped_rgba_images.append(warped_image)
+    
+    # blending rgba_images together to get target_image
+    warped_rgba_images = torch.squeeze(torch.stack(warped_rgba_images, dim=0))
+    target_image = processing.blending_images_ourspecialcase(warped_rgba_images)
+    
+    return target_image
+
+
+
+
+
+
 '''
 Test pipeline 
 
 '''
 
 # read in the data
-data_folder = "less_data/0cC7GPRFAIvP5i/"
-LF = get_data.read_lightfield(data_folder)
-param_dict = get_data.read_parameters(data_folder)
-depth_map = get_data.read_depth(data_folder, highres=False)
-depth_all_map = get_data.read_all_depths(data_folder, highres=False)
+#data_folder = "less_data/0cC7GPRFAIvP5i/"
+#LF = get_data.read_lightfield(data_folder)
+#param_dict = get_data.read_parameters(data_folder)
+#depth_map = get_data.read_depth(data_folder, highres=False)
+#depth_all_map = get_data.read_all_depths(data_folder, highres=False)
 
 # Config
 layers = 16 
@@ -94,16 +125,16 @@ input_poses.append(p_2)
 input_poses.append(p_3)
 input_poses.append(p_4)
 
-psvs, images = get_psvs(LF, depth_all_map, layers)
+#psvs, images = get_psvs(LF, depth_all_map, layers)
 
 # mpi = get_mpis(psvs, images, layers)
 # rgb, alpha = transform_mpis(mpi)
 
-psv_1 = torch.rand((4,15,64,64,8))
-psv_2 = torch.rand((4,15,64,64,8))
-psv_3 = torch.rand((4,15,64,64,8))
-psv_4 = torch.rand((4,15,64,64,8))
-psv_5 = torch.rand((4,15,64,64,8))
+psv_1 = torch.rand((2,15,64,64,8))
+psv_2 = torch.rand((2,15,64,64,8))
+psv_3 = torch.rand((2,15,64,64,8))
+psv_4 = torch.rand((2,15,64,64,8))
+psv_5 = torch.rand((2,15,64,64,8))
 
 psvs = list()
 
@@ -128,10 +159,10 @@ for psv in psvs:
 
     mpis = model(psv)
 
-    target_view = torch.rand((3,64,64), requires_grad=True)
-    ground_truth_target_view = torch.rand((3,64,64), requires_grad=True)
+    target_image = get_target_image(mpis)
+    gt_image = torch.rand((3,64,64), requires_grad=True)
 
-    loss = loss_function(target_view, ground_truth_target_view)
+    loss = loss_function(target_image, gt_image)
 
     loss.backward()
 

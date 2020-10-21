@@ -86,6 +86,6 @@ class MPIPredictionNet(nn.Module):
         b = self.softmax(params[3])
 
         # Stack together
-        mpis = torch.stack((r, g, b, alpha), dim=1)
+        mpis = torch.squeeze(torch.stack((r, g, b, alpha), dim=1))
 
         return mpis
