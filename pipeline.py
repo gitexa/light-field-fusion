@@ -2,8 +2,11 @@
 import torch
 import processing
 import get_data
+import small_net
+import large_net
 import matplotlib.pyplot as plt
 import numpy as np
+
 
 
 def get_psvs(LF, depth_all_map, layers):
@@ -55,11 +58,11 @@ def transform_mpis(rgba):
 def render_image(alpha, rgb, target_pose, input_poses):
 
     # select cameras 
-    alphas = alpha[:2, :2, :, :].reshape(-1, 512, 512)
-    rgbs = rgb[:2, :2, :, :].reshape(-1, 3, 512, 512)
+    #alphas = alpha[:2, :2, :, :].reshape(-1, 512, 512)
+    #rgbs = rgb[:2, :2, :, :].reshape(-1, 3, 512, 512)
 
     # render the new view 
-    target_view = processing.render_target_view(alphas, rgbs, target_pose, input_poses)
+    target_view = processing.render_target_view(alpha, rgb, target_pose, input_poses)
     
     return target_view
 
@@ -92,15 +95,62 @@ input_poses.append(p_3)
 input_poses.append(p_4)
 
 psvs, images = get_psvs(LF, depth_all_map, layers)
-mpi = get_mpis(psvs, images, layers)
-rgb, alpha = transform_mpis(mpi)
-target_view = render_image(alpha, rgb, target_pose, input_poses)
+
+# mpi = get_mpis(psvs, images, layers)
+# rgb, alpha = transform_mpis(mpi)
+
+psv_1 = torch.rand((4,15,64,64,8))
+psv_2 = torch.rand((4,15,64,64,8))
+psv_3 = torch.rand((4,15,64,64,8))
+psv_4 = torch.rand((4,15,64,64,8))
+psv_5 = torch.rand((4,15,64,64,8))
+
+psvs = list()
+
+psvs.append(psv_1)
+psvs.append(psv_2)
+psvs.append(psv_3)
+psvs.append(psv_4)
+psvs.append(psv_5)
+
+
+#model = small_net.MPIPredictionNet()
+model = large_net.MPIPredictionNet()
+loss_function = torch.nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(),lr=2e-4, amsgrad=True)
+
+# Starting training pipeline
+model.train()
+
+for psv in psvs:
+    
+    optimizer.zero_grad()
+
+    mpis = model(psv)
+
+    target_view = torch.rand((3,64,64), requires_grad=True)
+    ground_truth_target_view = torch.rand((3,64,64), requires_grad=True)
+
+    loss = loss_function(target_view, ground_truth_target_view)
+
+    loss.backward()
+
+    optimizer.step()
+    
+#mpi_separated = torch.split(mpis, split_size_or_sections=1, dim=1)
+#mpi_alpha = mpi_separated[0]
+#mpi_alpha = torch.unsqueeze(torch.squeeze(mpi_alpha),dim=1)
+#mpi_rgb = torch.squeeze(torch.stack((mpi_separated[1], mpi_separated[2], mpi_separated[3]), dim=1))
+
+#processing.back_to_front_alphacomposite(mpis)
+
+#target_view = render_image(mpi_alpha, mpi_rgb, target_pose, input_poses)
 
 # print images
-original_img  = images[0,0].permute(1,2,0).numpy()
-reproduce_img = target_view.permute(1,2,0).numpy()
+#original_img  = images[0,0].permute(1,2,0).numpy()
+#reproduce_img = target_view.permute(1,2,0).numpy()
 
-plt.imshow(original_img)
-plt.show()
-plt.imshow(reproduce_img)
-plt.show()
+#plt.imshow(original_img)
+#plt.show()
+#plt.imshow(reproduce_img)
+#plt.show()
