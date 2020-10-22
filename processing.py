@@ -19,25 +19,27 @@ def create_disp_tensor(depth_map, layers):
     max_disp = torch.max(disp_map)*1.000001
 
     #get the bin_size
-    bin_size  = max_disp/layers
+    bin_size  = (max_disp-min_disp)/layers
     #get the disparity_layer for every pixel
-    disp_layers = layers - 1 - (disp_shifted/bin_size).int()
+    disp_layers = layers - 1 - (disp_map-min_disp/bin_size).int()
 
     #convert to 3d 1-hot-encoding disparity_tensor (512,512,layers)
     disp_tensor = (torch.arange(layers) == disp_layers[...,None]).int()
     
-    return disp_tensor 
+    return disp_tensor, min_disp
 
-# takes a 9x9 grid of depth_maps and returns a 9x9 grid of disp_tensors
+# takes a 9x9 grid of depth_maps and returns a 9x9 grid of disp_tensors and a 9x9 grid of min_disps
 def create_all_disp_tensors(depth_all_map, layers):
     assert depth_all_map.shape == (9,9,512,512), 'Depth_all_map needs to be 9x9x512x512'
     assert type(layers) == int, 'layers needs to be integer'
     
     all_disp_tensor = torch.zeros((9,9,512,512,layers))
+    all_min_disp = torch.zeros((9,9))
     for i in range(9):
         for j in range(9):
-            all_disp_tensor[i,j] = create_disp_tensor(depth_all_map[i,j],layers)
-    return all_disp_tensor
+            all_disp_tensor[i,j], all_min_disp[i,j] = create_disp_tensor(depth_all_map[i,j],layers)
+
+    return all_disp_tensor, all_min_disp
     
 def create_psv(image, disp_tensor):
     
@@ -69,6 +71,24 @@ def create_all_psv(image_all, disp_tensor_all, layers):
     return all_psv
     
     
+def dataset_into_psvs(data_folder, layers=8):
+    
+    LF            = get_data.read_lightfield(data_folder)
+    param         = get_data.read_parameters(data_folder)
+    depth_all_map = get_data.read_all_depths(data_folder, highres=False)
+    
+    disp_tensors, min_disps = create_all_disp_tensors(depth_all_map, layers)
+    psvs = create_all_psv(LF, disp_tensors, layers)
+    
+    disparity_scaling = param["baseline_mm"]*(512/param["sensor_size_mm"])*
+                        param["focal_length_mm"]*(512/param["sensor_size_mm"])*
+                        1./params["depth_map_scale"]
+    
+    #return:
+    # 9x9x3x512x512x8 PSV tensor
+    # 9x9x1 Min_disp of every image
+    # Scalar disparity_scaling factor of the scene
+    return psvs, min_disps, disparity_scaling
     
     
 # takes a depth tensor of shape (512,512,depth) as input
@@ -234,22 +254,22 @@ def blending_images_ourspecialcase(rgba):
 # input_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
 # output_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
 
-def homography(mpi, input_pos, output_pos):
+def homography_general(input_dict):
   
-    layers = mpi.shape[-1]
+    mpi = input_dict["mpi"]
     
     # Note: camera parameters that needed to be given to the function somehow
     # baselineMM
-    # focalLength;;
+    # focalLength
     # SensorWidthMM
     # ImageSize 512,512
     # Disparity Scaling to correct for the real depth
-    baseline_Pixel  = baselineMM*ImageSizePixel / SensorWidthMM
-    focalLengthPixel = focalLengthMM*ImageWidthPixel / SensorWidthMM
-    disparity_factor = focalLengthPixel * baseline_Pixel * disparityScaling
+    disparity_factor = input_dict["disparity_factor"]
+    mpi_pos = input_dict["mpi_pos"]
+    target_pos = input_dict["target_pos"]
     
-    camera_xDiff = (input_pos[0]-output_pos[0])
-    camera_yDiff = (input_pos[1]-output_pos[1])
+    camera_xDiff = (mpi_pos[0]-target_pos[0])
+    camera_yDiff = (mpi_pos[1]-target_pos[1])
     
 
     target_mpi = torch.zeros((4,512,512,layers))
@@ -258,8 +278,7 @@ def homography(mpi, input_pos, output_pos):
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_xDiff))
             target_mpi[:,:-disparity,:,d] = mpi[:,disparity:,:,d]
-
-    if camera_xDiff <= 0: 
+    if camera_xDiff =< 0: 
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_xDiff))
             target_mpi[:,disparity:,:,d] = mpi[:,:-disparity,:,d]   
@@ -268,13 +287,13 @@ def homography(mpi, input_pos, output_pos):
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,:-disparity,d] = mpi[:,:,disparity:,d]
-
-    if camera_yDiff <= 0: 
+    if camera_yDiff =< 0: 
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,disparity:,d] = mpi[:,:,:-disparity,d]
             
     return target_mpi
+        
         
         
 
