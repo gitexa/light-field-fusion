@@ -2,17 +2,22 @@ from PIL.Image import alpha_composite
 import torch
 from torchvision import transforms
 
+import h5py
+import pickle
+import os
+import get_data
+import pickle
 
 # Input  : (512,512) depth_map
 #          Integer layers          
-# Output : (512,512, layers) depth tensor
+# Output : (512,512, layers) depth tensor, scalar min_disp by which the disp_tensor is shifted
 
 def create_disp_tensor(depth_map, layers):
     assert depth_map.shape == (512,512), 'Depth map needs to be shape (512,512)'
     assert type(layers) == int, 'layers needs to be integer'
 
 	# convert the depth to disparity
-    disp_map = 1/depth_map
+    disp_map = 1./depth_map.float()
 
     #get the min_disparity and the max_disparity
     min_disp = torch.min(disp_map)*0.999999
@@ -20,6 +25,7 @@ def create_disp_tensor(depth_map, layers):
 
     #get the bin_size
     bin_size  = (max_disp-min_disp)/layers
+
     #get the disparity_layer for every pixel
     disp_layers = layers - 1 - (disp_map-min_disp/bin_size).int()
 
@@ -41,14 +47,14 @@ def create_all_disp_tensors(depth_all_map, layers):
 
     return all_disp_tensor, all_min_disp
     
-def create_psv(image, disp_tensor):
+def create_psv(image, disp_tensor, layers):
     
     # Input: RGB image 3 x 512 x 512 
     # Input: Disp tensor 512 x 512 x Depth
     # Output: PSV 3 x 512 x 512 x Depth
     
     assert len(disp_tensor.shape)==3, 'Disp tensor needs to be 512x512xdepth'
-    layers = depth_tensor.shape[2]
+    layers = disp_tensor.shape[2]
     assert disp_tensor.shape == (512,512,layers), 'Depth tensor needs to be 512x512xdepth'
 
     assert len(image.shape)==3, 'Image must be 3x512x512'
@@ -77,18 +83,48 @@ def dataset_into_psvs(data_folder, layers=8):
     param         = get_data.read_parameters(data_folder)
     depth_all_map = get_data.read_all_depths(data_folder, highres=False)
     
+    LF            = torch.from_numpy(LF).permute([0,1,4,2,3]).float()/255.
+    depth_all_map = torch.from_numpy(depth_all_map)
+    
     disp_tensors, min_disps = create_all_disp_tensors(depth_all_map, layers)
     psvs = create_all_psv(LF, disp_tensors, layers)
-    
-    disparity_scaling = param["baseline_mm"]*(512/param["sensor_size_mm"])*
-                        param["focal_length_mm"]*(512/param["sensor_size_mm"])*
-                        1./params["depth_map_scale"]
     
     #return:
     # 9x9x3x512x512x8 PSV tensor
     # 9x9x1 Min_disp of every image
-    # Scalar disparity_scaling factor of the scene
-    return psvs, min_disps, disparity_scaling
+    # scene parameters
+    return psvs, min_disps, param
+
+def save_psvs(psvs, min_disps, param, data_folder, scene_number):
+    
+    for i in range(9):
+        for j in range(9):
+            
+            imgpath = str(scene_number)+str(i)+str(j)+'.pt'
+            path = os.path.join(data_folder, imgpath)
+            torch.save( [psvs[i,j].clone(), min_disps[i,j].clone(), param] , path )
+    
+    
+	
+	
+# This function is the important one
+# Input: 
+# data_folder path, e.g. "Data/set1"
+# scene number to put in the names, i.e. the i in "i62.pt"
+# the number of layers, default set to 8
+
+# The function reads in the 9x9x512x512 depth-layer tensor and the 9x9x3x512x512 image tensor
+# It safes 81 .pt files containing data of the form [PSV, Min_disp, param]
+# These can be loaded individually with        psv, min_disp, param = torch.load( ... the path ...)
+def create_psv_dataset(data_folder, scene_number, layers=8):
+    
+    psvs, min_disps, disparity_scaling = dataset_into_psvs(data_folder, layers)
+    
+    save_psvs( psvs, min_disps, disparity_scaling, data_folder, scene_number)
+    
+    
+    
+    
     
     
 # takes a depth tensor of shape (512,512,depth) as input
@@ -198,6 +234,7 @@ def bilinear_interpolation(x, y, poses):
 def render_target_view(alphas, rgbs, p_target, poses):
     
 
+
     w_t_1, w_t_2, w_t_3, w_t_4 = bilinear_interpolation(p_target[0], p_target[1], poses)
 
     r = (w_t_1 * torch.mul(alphas[0], rgbs[0,0,:,:]) + w_t_2 * torch.mul(alphas[1], rgbs[1,0,:,:]) + w_t_3 * torch.mul(alphas[2], rgbs[2,0,:,:]) + w_t_4 * torch.mul(alphas[3], rgbs[3,0,:,:])) / (w_t_1*alphas[0] + w_t_2*alphas[1] + w_t_3*alphas[2] + w_t_4*alphas[3])
@@ -210,28 +247,6 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 #target_view = render_target_view(alphas, rgbs, p_target, poses)
 #print(target_view)
-
-
-# Function to render target pose using rgba image and interpolation weights; in our simple geometric case within a grid, two crosses and target pose in the middle 
-# Input: alpha- and rgb-images (MPI), target pose, camera poses
-# Output: rendered target view
-
-def blending_images_ourspecialcase(rgba):
-
-    w_t_1 = 0.5
-    w_t_2 = 0.5
-
-    r = (w_t_1 * torch.mul(rgba[0][3], rgba[0][0]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][0])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
-    g = (w_t_1 * torch.mul(rgba[0][3], rgba[0][1]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][1])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
-    b = (w_t_1 * torch.mul(rgba[0][3], rgba[0][2]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][2])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
-
-    target_view = torch.squeeze(torch.stack((r,g,b), dim=0))
-
-    return target_view
-
-
-
-
 
 
 
@@ -278,7 +293,7 @@ def homography_general(input_dict):
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_xDiff))
             target_mpi[:,:-disparity,:,d] = mpi[:,disparity:,:,d]
-    if camera_xDiff =< 0: 
+    if camera_xDiff <= 0: 
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_xDiff))
             target_mpi[:,disparity:,:,d] = mpi[:,:-disparity,:,d]   
@@ -287,13 +302,12 @@ def homography_general(input_dict):
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,:-disparity,d] = mpi[:,:,disparity:,d]
-    if camera_yDiff =< 0: 
+    if camera_yDiff <= 0: 
         for d in range(layers):
             disparity = int(d*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,disparity:,d] = mpi[:,:,:-disparity,d]
             
     return target_mpi
-        
         
         
 
