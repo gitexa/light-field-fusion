@@ -144,7 +144,6 @@ psvs.append(psv_3)
 psvs.append(psv_4)
 psvs.append(psv_5)
 
-
 #model = small_net.MPIPredictionNet()
 model = large_net.MPIPredictionNet()
 loss_function = torch.nn.MSELoss()

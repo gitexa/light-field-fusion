@@ -169,7 +169,7 @@ def load_psvs_from_disk(path_to_data, scene_dir, psv_coords):
 
     # TODO: load correct PSV and assert psv to be psv/tensor
     #psv = torch.load(path)
-    psv = torch.rand(3,24,24,8)
+    psv = torch.rand(3,512,512,8)
 
     return psv
 
