@@ -308,6 +308,20 @@ def homography_general(input_dict):
             target_mpi[:,:,disparity:,d] = mpi[:,:,:-disparity,d]
             
     return target_mpi
+
+def blending_images_ourspecialcase(rgba):
+
+    w_t_1 = 0.5
+    w_t_2 = 0.5
+
+    r = (w_t_1 * torch.mul(rgba[0][3], rgba[0][0]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][0])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
+    g = (w_t_1 * torch.mul(rgba[0][3], rgba[0][1]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][1])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
+    b = (w_t_1 * torch.mul(rgba[0][3], rgba[0][2]) + w_t_2 * torch.mul(rgba[1][3], rgba[1][2])) / (w_t_1*rgba[0][3] + w_t_2*rgba[1][3])
+
+    target_view = torch.squeeze(torch.stack((r,g,b), dim=0))
+
+    return target_view
+
         
         
 
