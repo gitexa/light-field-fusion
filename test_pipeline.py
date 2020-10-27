@@ -1,3 +1,4 @@
+import os
 import dataset_processing
 import dataset
 import torch 
@@ -8,6 +9,7 @@ import large_net
 import matplotlib.pyplot as plt
 import numpy as np
 import pipeline
+import json
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
@@ -19,11 +21,19 @@ if(torch.cuda.is_available() == True):
     device = torch.device('cuda:0')
 
 'Parameters'
-relative_path_to_model = 'model'
+relative_path_to_results = 'results'
 relative_path_to_scenes = 'less_data'
-max_epochs = 10
+max_epochs = 3
+
+'Create folder structure'
+if(not os.path.isdir(relative_path_to_results)):
+    os.mkdir(relative_path_to_results)
+    os.mkdir(relative_path_to_results + '/model')
+    os.mkdir(relative_path_to_results + '/metrics')
+assert os.path.isdir(relative_path_to_scenes)
 
 'Example dataset'
+#TODO add all scenes from dataset 
 all_scenes = list()
 all_scenes.append('0cC7GPRFAIvP5i')
 all_scenes.append('1eTVjMYXkOBq6b')
@@ -65,8 +75,8 @@ best_metric_epoch = 0
 print('-' * 60)
 print('Start training:')
 for epoch in range(max_epochs):
-    print('-' * 10)
-    print(f"Training - Epoch {epoch + 1}/{max_epochs}")
+    print('-' * 60)
+    print(f"Training | Epoch {epoch + 1}/{max_epochs}")
     epoch_loss = 0
     step = 0
     model.train()
@@ -88,19 +98,24 @@ for epoch in range(max_epochs):
         optimizer.step()
         epoch_loss += loss.item()
         print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
+
+        #TODO
+        if(step>10):
+            break
     
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
-    print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
+    print('-' * 10)
+    print(f"Summary | epoch: {epoch + 1}, average loss: {epoch_loss:.4f}")
 
 
     'Validate for every 10th epoch'
-    val_interval = 10
+    val_interval = 2
     if (epoch + 1) % val_interval == 0:
         model.eval()
         with torch.no_grad():
             print('-' * 60)
-            print('Evaluation - epoch {}'.format(epoch+1))
+            print('Validation | epoch {}'.format(epoch+1))
             val_loss = 0
             val_step = 0
             for data in validation_generator:
@@ -111,23 +126,32 @@ for epoch in range(max_epochs):
                     target_image.to(device)
                 mpis = model(psvs)
                 loss = loss_function(target_image, pipeline.get_target_image(mpis))
-                val_loss += loss
+                val_loss += loss.item()
+
+                #TODO
+                if(val_step>10):
+                    break
             val_loss /= val_step
             validation_epoch_loss_values.append((epoch, val_loss))
 
             if(val_loss<best_metric):
                 best_metric = val_loss
                 best_metric_epoch = epoch
-                torch.save(model.state_dict(), relative_path_to_model + str('/'+ epoch +'_best_metric_model.pth'))
+                torch.save(model.state_dict(), relative_path_to_results + '/model/'+ str(epoch) +'_best_metric_model.pth')
                 print('Saved new best metric model')
                     
-            print('Validation - Current metric: ' + str(val_loss))
-            print('Validation - Best metric: ' + str(best_metric) + '[epoch: ' + best_metric_epoch + ']')
+            print('Current metric: ' + str(val_loss))
+            print('Best metric: ' + str(best_metric) + ' (epoch: ' + str(best_metric_epoch) + ')')
         
-    if (epoch == 1):
+    if (epoch == 0):
+        torch.save(model.state_dict(), relative_path_to_results + '/model/'+ str(epoch) +'_best_metric_model.pth')
         print('Saved model after one epoch for testing')
-        torch.save(model.state_dict(), relative_path_to_model + str('/'+ epoch +'_best_metric_model.pth'))
 
+'Save metrics'
+with open(relative_path_to_results + '/metrics/' + 'training_epoch_loss_values.txt', 'w') as filehandle:
+    json.dump(training_epoch_loss_values, filehandle)
+with open(relative_path_to_results + '/metrics/' + 'validation_epoch_loss_values.txt', 'w') as filehandle:
+    json.dump(validation_epoch_loss_values, filehandle)
 
         
 #dataset.__getitem__(0)

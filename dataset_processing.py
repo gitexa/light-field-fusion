@@ -169,7 +169,7 @@ def load_psvs_from_disk(path_to_data, scene_dir, psv_coords):
 
     # TODO: load correct PSV and assert psv to be psv/tensor
     #psv = torch.load(path)
-    psv = torch.rand(3,128,128,8)
+    psv = torch.rand(3,64,64,8)
 
     return psv
 
@@ -188,7 +188,7 @@ def get_target_image_from_disk(path_to_data, scene_dir, target_image_coords):
     
     path = path_to_data + '/' + scene_dir + '/' + 'input_Cam0' + coords2string(target_image_coords) +'.png' 
     pil_image = Image.open(path)
-    pil_image = pil_image.resize((128, 128))
+    pil_image = pil_image.resize((64, 64))
     #TODO implement resizing operation 
     pil2tensor = transforms.ToTensor()
     rgb_image = torch.squeeze(pil2tensor(pil_image))
