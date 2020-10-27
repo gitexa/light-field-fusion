@@ -1,7 +1,7 @@
 from PIL.Image import alpha_composite
 import torch
 from torchvision import transforms
-
+from torchvision import utils
 import h5py
 import pickle
 import os
@@ -334,6 +334,13 @@ def blending_images_ourspecialcase(rgba):
     target_view = torch.squeeze(torch.stack((r,g,b), dim=0))
 
     return target_view
+
+def save_images(relative_path_to_results, target_image, predicted_target_image, sample_id, target_image_pose, epoch, loss):
+    path_target_image = relative_path_to_results + '/images/' + str(sample_id) + '_' + str(target_image_pose) + '_epoch' + str(epoch) + '_target_image.png'
+    path_predicted_image = relative_path_to_results + '/images/' + str(sample_id) + '_' + str(target_image_pose) + '_epoch_' + str(epoch) + '_loss_' + str(loss) + '_predicted_image.png'
+
+    utils.save_image(tensor=target_image, fp=path_target_image)
+    utils.save_image(tensor=predicted_target_image, fp=path_predicted_image)
 
         
         

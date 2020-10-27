@@ -21,15 +21,19 @@ if(torch.cuda.is_available() == True):
     device = torch.device('cuda:0')
 
 'Parameters'
+torch.manual_seed(0)
 relative_path_to_results = 'results'
 relative_path_to_scenes = 'less_data'
 max_epochs = 3
+validation_split = .2
 
 'Create folder structure'
 if(not os.path.isdir(relative_path_to_results)):
     os.mkdir(relative_path_to_results)
     os.mkdir(relative_path_to_results + '/model')
     os.mkdir(relative_path_to_results + '/metrics')
+    os.mkdir(relative_path_to_results + '/plots')
+    os.mkdir(relative_path_to_results + '/images')
 assert os.path.isdir(relative_path_to_scenes)
 
 'Example dataset'
@@ -42,7 +46,6 @@ num_scenes = len(all_scenes)
 all_ids = dataset_processing.generate_all_ids(all_scenes)
 
 'Create customized pytorch dataset'
-validation_split = .2
 random_seed = 42
 all_data = dataset.Dataset(all_ids, relative_path_to_scenes)
 all_data_size = len(all_data)
@@ -53,10 +56,8 @@ np.random.shuffle(indices)
 train_indices, val_indices = indices[split:], indices[:split]
 train_sampler = SubsetRandomSampler(train_indices)
 valid_sampler = SubsetRandomSampler(val_indices)
-
 training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
 validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
-
 
 'Create model, loss function and optimizer'
 model = large_net.MPIPredictionNet()
@@ -68,7 +69,7 @@ optimizer = torch.optim.Adam(model.parameters(),lr=2e-4, amsgrad=True)
 'Loss for training and validation'
 training_epoch_loss_values = list()
 validation_epoch_loss_values = list()
-best_metric = 0
+best_metric = 100 #TODO solve better
 best_metric_epoch = 0
 
 'Start training process'
@@ -106,7 +107,7 @@ for epoch in range(max_epochs):
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
     print('-' * 10)
-    print(f"Summary | epoch: {epoch + 1}, average loss: {epoch_loss:.4f}")
+    print(f"Summary | Training | Epoch {epoch + 1}/{max_epochs} | Average loss {epoch_loss:.4f}")
 
 
     'Validate for every 10th epoch'
@@ -115,7 +116,7 @@ for epoch in range(max_epochs):
         model.eval()
         with torch.no_grad():
             print('-' * 60)
-            print('Validation | epoch {}'.format(epoch+1))
+            print(f"Validation | Epoch {epoch + 1}/{max_epochs}")
             val_loss = 0
             val_step = 0
             for data in validation_generator:
@@ -125,7 +126,9 @@ for epoch in range(max_epochs):
                     psvs.to(device)
                     target_image.to(device)
                 mpis = model(psvs)
-                loss = loss_function(target_image, pipeline.get_target_image(mpis))
+                predicted_target_image = pipeline.get_target_image(mpis)
+                loss = loss_function(target_image, predicted_target_image)
+                processing.save_images(relative_path_to_results, target_image, predicted_target_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
                 val_loss += loss.item()
 
                 #TODO
@@ -140,9 +143,11 @@ for epoch in range(max_epochs):
                 torch.save(model.state_dict(), relative_path_to_results + '/model/'+ str(epoch) +'_best_metric_model.pth')
                 print('Saved new best metric model')
                     
-            print('Current metric: ' + str(val_loss))
-            print('Best metric: ' + str(best_metric) + ' (epoch: ' + str(best_metric_epoch) + ')')
-        
+
+            print(f"Summary | Validation | Epoch {epoch + 1}/{max_epochs} | Average loss {val_loss:.4f}")
+            print("All metrics and images saved")
+            print(f"Current metric {val_loss:.4f} | Best metric {best_metric:.4f} (Epoch {best_metric_epoch + 1}/{max_epochs})")
+
     if (epoch == 0):
         torch.save(model.state_dict(), relative_path_to_results + '/model/'+ str(epoch) +'_best_metric_model.pth')
         print('Saved model after one epoch for testing')
@@ -152,6 +157,22 @@ with open(relative_path_to_results + '/metrics/' + 'training_epoch_loss_values.t
     json.dump(training_epoch_loss_values, filehandle)
 with open(relative_path_to_results + '/metrics/' + 'validation_epoch_loss_values.txt', 'w') as filehandle:
     json.dump(validation_epoch_loss_values, filehandle)
+
+'Save plot of metrics'
+plt.figure('train', (12, 6))
+plt.subplot(1, 2, 1)
+plt.title('Training - Loss')
+x = [i[0] for i in training_epoch_loss_values]
+y = [i[1] for i in training_epoch_loss_values]
+plt.xlabel('epoch')
+plt.plot(x, y, color='red')
+plt.subplot(1, 2, 2)
+plt.title('Validation - Loss')
+x = [i[0] for i in validation_epoch_loss_values]
+y = [i[1] for i in validation_epoch_loss_values]
+plt.xlabel('epoch')
+plt.plot(x, y, color='green')
+plt.savefig(relative_path_to_results + '/plots/' + 'training__and_validation.png')
 
         
 #dataset.__getitem__(0)
