@@ -10,7 +10,7 @@ import pickle
 
 # Input  : (512,512) depth_map
 #          Integer layers          
-# Output : (512,512, layers) depth tensor, scalar min_disp by which the disp_tensor is shifted
+# Output : (512,512, layers) depth tensor, scalar min_disp by which the disp_tensor is shifted, scalar bin_size
 
 def create_disp_tensor(depth_map, layers):
     assert depth_map.shape == (512,512), 'Depth map needs to be shape (512,512)'
@@ -32,20 +32,21 @@ def create_disp_tensor(depth_map, layers):
     #convert to 3d 1-hot-encoding disparity_tensor (512,512,layers)
     disp_tensor = (torch.arange(layers) == disp_layers[...,None]).int()
     
-    return disp_tensor, min_disp
+    return disp_tensor, min_disp, bin_size
 
-# takes a 9x9 grid of depth_maps and returns a 9x9 grid of disp_tensors and a 9x9 grid of min_disps
+# takes a 9x9 grid of depth_maps and returns a 9x9 grid of disp_tensors and 9x9 grids of min_disps and bin_sizes
 def create_all_disp_tensors(depth_all_map, layers):
     assert depth_all_map.shape == (9,9,512,512), 'Depth_all_map needs to be 9x9x512x512'
     assert type(layers) == int, 'layers needs to be integer'
     
     all_disp_tensor = torch.zeros((9,9,512,512,layers))
     all_min_disp = torch.zeros((9,9))
+    all_bin_size = torch.zeros((9,9))
     for i in range(9):
         for j in range(9):
-            all_disp_tensor[i,j], all_min_disp[i,j] = create_disp_tensor(depth_all_map[i,j],layers)
+            all_disp_tensor[i,j], all_min_disp[i,j], all_bin_size[i,j] = create_disp_tensor(depth_all_map[i,j],layers)
 
-    return all_disp_tensor, all_min_disp
+    return all_disp_tensor, all_min_disp, all_bin_size
     
 def create_psv(image, disp_tensor, layers):
     
@@ -86,7 +87,7 @@ def dataset_into_psvs(data_folder, layers=8):
     LF            = torch.from_numpy(LF).permute([0,1,4,2,3]).float()/255.
     depth_all_map = torch.from_numpy(depth_all_map)
     
-    disp_tensors, min_disps = create_all_disp_tensors(depth_all_map, layers)
+    disp_tensors, min_disps, bin_sizes = create_all_disp_tensors(depth_all_map, layers)
     psvs = create_all_psv(LF, disp_tensors, layers)
     
     #return:
@@ -95,14 +96,14 @@ def dataset_into_psvs(data_folder, layers=8):
     # scene parameters
     return psvs, min_disps, param
 
-def save_psvs(psvs, min_disps, param, data_folder, scene_number):
+def save_psvs(psvs, min_disps, bin_sizes,param, data_folder, scene_number):
     
     for i in range(9):
         for j in range(9):
             
             imgpath = str(scene_number)+str(i)+str(j)+'.pt'
             path = os.path.join(data_folder, imgpath)
-            torch.save( [psvs[i,j].clone(), min_disps[i,j].clone(), param] , path )
+            torch.save( [psvs[i,j].clone(), min_disps[i,j].clone(), bin_sizes[i,j].clone(), param] , path )
     
     
 	
@@ -114,13 +115,15 @@ def save_psvs(psvs, min_disps, param, data_folder, scene_number):
 # the number of layers, default set to 8
 
 # The function reads in the 9x9x512x512 depth-layer tensor and the 9x9x3x512x512 image tensor
-# It safes 81 .pt files containing data of the form [PSV, Min_disp, param]
-# These can be loaded individually with        psv, min_disp, param = torch.load( ... the path ...)
+# It safes 81 .pt files containing data of the form [PSV, Min_disp, bin_size, param]
+# These can be loaded individually with        psv, min_disp,bin_size, param = torch.load( ... the path ...)
 def create_psv_dataset(data_folder, scene_number, layers=8):
     
-    psvs, min_disps, disparity_scaling = dataset_into_psvs(data_folder, layers)
+    psvs, min_disps, bin_sizes, param = dataset_into_psvs(data_folder, layers)
     
-    save_psvs( psvs, min_disps, disparity_scaling, data_folder, scene_number)
+    save_psvs( psvs, min_disps, bin_sizes, param, data_folder, scene_number)
+    
+    
     
     
     
@@ -269,7 +272,7 @@ def render_target_view(alphas, rgbs, p_target, poses):
 # input_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
 # output_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
 
-def homography_general(input_dict):
+def homography(input_dict):
   
     mpi = input_dict["mpi"]
     
@@ -279,35 +282,45 @@ def homography_general(input_dict):
     # SensorWidthMM
     # ImageSize 512,512
     # Disparity Scaling to correct for the real depth
-    disparity_factor = input_dict["disparity_factor"]
+    
+    baseline = input_dict["baseline"]
+    focal_length = input_dict["focal_length"]
+    sensor_size = input_dict["sensor_size"]
+    min_disp = input_dict["min_disp"]
+    bin_size = input_dict["bin_size"]
+    
+    
     mpi_pos = input_dict["mpi_pos"]
     target_pos = input_dict["target_pos"]
     
     camera_xDiff = (mpi_pos[0]-target_pos[0])
     camera_yDiff = (mpi_pos[1]-target_pos[1])
     
+    disparity_factor = focal_length * baseline * (512./sensor_size.astype(float)) / 1000.
 
     target_mpi = torch.zeros((4,512,512,layers))
     
     if camera_xDiff > 0: 
         for d in range(layers):
-            disparity = int(d*disparity_factor*abs(camera_xDiff))
+            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_xDiff))
             target_mpi[:,:-disparity,:,d] = mpi[:,disparity:,:,d]
     if camera_xDiff <= 0: 
         for d in range(layers):
-            disparity = int(d*disparity_factor*abs(camera_xDiff))
+            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_xDiff))
             target_mpi[:,disparity:,:,d] = mpi[:,:-disparity,:,d]   
             
     if camera_yDiff > 0: 
         for d in range(layers):
-            disparity = int(d*disparity_factor*abs(camera_yDiff))
+            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,:-disparity,d] = mpi[:,:,disparity:,d]
     if camera_yDiff <= 0: 
         for d in range(layers):
-            disparity = int(d*disparity_factor*abs(camera_yDiff))
+            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_yDiff))
             target_mpi[:,:,disparity:,d] = mpi[:,:,:-disparity,d]
             
     return target_mpi
+        
+        
 
 def blending_images_ourspecialcase(rgba):
 
