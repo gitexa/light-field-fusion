@@ -269,6 +269,7 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 # function to perform the homography warp 
 
+
 def homography(input_dict):
   
     mpi1 = input_dict['psvs'][0]
@@ -280,6 +281,7 @@ def homography(input_dict):
     sensor_size = input_dict['sensorWidthMM'] 
     min_disp = input_dict["min_disp"]
     bin_size = input_dict["bin_size"]
+    focus_dist = input_dict["focus_distance_m"].astype(float)
     
     disparity_factor = focal_length * baseline * (512./sensor_size.astype(float)) / 1000.
 
@@ -294,29 +296,26 @@ def homography(input_dict):
     camera_xDiff = (mpi1_pos[0]-target_pos[0])
     camera_yDiff = (mpi1_pos[1]-target_pos[1])
     
-    if camera_xDiff > 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_xDiff))
-            target_mpi1[:,:-disparity,:,d] = mpi1[:,disparity:,:,d]
-            target_mpi2[:,disparity:,:,d] = mpi2[:,:-disparity,:,d]   
-    if camera_xDiff <= 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_xDiff))
-            target_mpi1[:,disparity:,:,d] = mpi1[:,:-disparity,:,d]   
-            target_mpi2[:,:-disparity,:,d] = mpi2[:,disparity:,:,d]
-            
-    if camera_yDiff > 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_yDiff))
-            target_mpi1[:,:,:-disparity,d] = mpi1[:,:,disparity:,d]
-            target_mpi2[:,:,disparity:,d] = mpi2[:,:,:-disparity,d]
-    if camera_yDiff <= 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_yDiff))
-            target_mpi1[:,:,disparity:,d] = mpi1[:,:,:-disparity,d]
-            target_mpi2[:,:,:-disparity,d] = mpi2[:,:,disparity:,d]
-
-    return torch.stack(target_mpi1, target_mpi2, dim=0)
+    for d in range(layers):
+        xdisparity = int((d*bin_size + min_disp - 1/focus_dist)*disparity_factor*camera_xDiff)
+        ydisparity = int((d*bin_size + min_disp - 1/focus_dist)*disparity_factor*camera_yDiff)
+        
+        if xdisparity >= 0 and ydisparity >= 0:
+            target_mpi1[:,:-xdisparity,:-ydisparity,d] = mpi1[:,xdisparity:,ydisparity:,d]
+            target_mpi2[:,xdisparity:,ydisparity:,d] = mpi2[:,:-xdisparity,:-ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
+        if xdisparity >= 0 and ydisparity < 0:
+            target_mpi1[:,:-xdisparity,:ydisparity,d] = mpi1[:,xdisparity:,-ydisparity:,d]
+            target_mpi2[:,xdisparity:,-ydisparity:,d] = mpi2[:,:-xdisparity,:ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
+        if xdisparity < 0 and ydisparity >= 0:
+            target_mpi1[:,:xdisparity,:-ydisparity,d] = mpi1[:,-xdisparity:,ydisparity:,d]
+            target_mpi2[:,-xdisparity:,ydisparity:,d] = mpi2[:,:xdisparity,:-ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
+        if xdisparity < 0 and ydisparity < 0:
+            target_mpi1[:,:xdisparity,:ydisparity,d] = mpi1[:,-xdisparity:,-ydisparity:,d]
+            target_mpi2[:,-xdisparity:,ydisparity:,d] = mpi2[:,:xdisparity,:-ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
         
         
 
