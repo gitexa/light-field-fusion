@@ -17,7 +17,8 @@ def create_disp_tensor(depth_map, layers):
     assert type(layers) == int, 'layers needs to be integer'
 
 	# convert the depth to disparity
-    disp_map = 1./depth_map.float()
+    disp_map = 1./(depth_map.float())
+
 
     #get the min_disparity and the max_disparity
     min_disp = torch.min(disp_map)*0.999999
@@ -27,8 +28,7 @@ def create_disp_tensor(depth_map, layers):
     bin_size  = (max_disp-min_disp)/layers
 
     #get the disparity_layer for every pixel
-    disp_layers = layers - 1 - (disp_map-min_disp/bin_size).int()
-
+    disp_layers = layers - 1 - ((disp_map-min_disp)/bin_size).int()
     #convert to 3d 1-hot-encoding disparity_tensor (512,512,layers)
     disp_tensor = (torch.arange(layers) == disp_layers[...,None]).int()
     
@@ -94,7 +94,7 @@ def dataset_into_psvs(data_folder, layers=8):
     # 9x9x3x512x512x8 PSV tensor
     # 9x9x1 Min_disp of every image
     # scene parameters
-    return psvs, min_disps, param
+    return psvs, min_disps, bin_sizes, param
 
 def save_psvs(psvs, min_disps, bin_sizes,param, data_folder, scene_number):
     
@@ -122,6 +122,7 @@ def create_psv_dataset(data_folder, scene_number, layers=8):
     psvs, min_disps, bin_sizes, param = dataset_into_psvs(data_folder, layers)
     
     save_psvs( psvs, min_disps, bin_sizes, param, data_folder, scene_number)
+    
     
     
     
