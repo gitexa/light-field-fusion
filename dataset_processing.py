@@ -154,24 +154,28 @@ def get_psvs(path_to_data, scene_dir, mpi_coords):
     psv_ll_coords = (row+1, column-1)
     psv_lr_coords = (row+1, column+1)
 
-    psv_center = load_psvs_from_disk(path_to_data, scene_dir, psv_center_coords)
-    psv_ul = load_psvs_from_disk(path_to_data, scene_dir, psv_ul_coords)
-    psv_ur = load_psvs_from_disk(path_to_data, scene_dir, psv_ur_coords)
-    psv_ll = load_psvs_from_disk(path_to_data, scene_dir, psv_ll_coords)
-    psv_lr = load_psvs_from_disk(path_to_data, scene_dir, psv_lr_coords)
+    psv_center, psv_center_min_disp, psv_center_bin_size = load_psvs_from_disk(path_to_data, scene_dir, psv_center_coords)
+    psv_ul, psv_ul_min_disp, psv_ul_bin_size = load_psvs_from_disk(path_to_data, scene_dir, psv_ul_coords)
+    psv_ur, psv_ur_min_disp, psv_ur_bin_size = load_psvs_from_disk(path_to_data, scene_dir, psv_ur_coords)
+    psv_ll, psv_ll_min_disp, psv_ll_bin_size = load_psvs_from_disk(path_to_data, scene_dir, psv_ll_coords)
+    psv_lr, psv_lr_min_disp, psv_lr_bin_size = load_psvs_from_disk(path_to_data, scene_dir, psv_lr_coords)
 
     psvs = torch.cat((psv_center, psv_ul, psv_ur, psv_ll, psv_lr), dim=0)
 
-    return psvs
+    return psvs, psv_center_min_disp, psv_center_bin_size
 
 def load_psvs_from_disk(path_to_data, scene_dir, psv_coords):
     path = path_to_data + '/' + scene_dir + '/' + 'psv_' + parse_coordinates2camsnumbering(psv_coords) + '.pt'
 
-    # TODO: load correct PSV and assert psv to be psv/tensor
-    #psv = torch.load(path)
-    psv = torch.rand(3,64,64,8)
+    #TODO: load correct PSV and assert psv to be psv/tensor
+    psv_package = torch.load(path)
+    psv = psv_package['psv']
+    min_disp = psv_package['min_disp']
+    bin_size = psv_package['bin_size']
 
-    return psv
+    #psv = torch.rand(3,64,64,8)
+
+    return psv, min_disp, bin_size
 
 def load_config_from_disk(path_to_data, scene_dir):
     path = path_to_data + '/' + scene_dir + '/parameters.cfg'

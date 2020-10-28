@@ -71,7 +71,7 @@ def render_image(alpha, rgb, target_pose, input_poses):
 # Input: prediced MPIs
 # Output: target view 
 
-def get_target_image(mpis):
+def get_target_image(mpis, data):
 
     warped_rgba_images = list()
     
@@ -81,10 +81,12 @@ def get_target_image(mpis):
     # for every mpi do back-to-front-alpha-compositing and warping into target perspective
     for mpi in mpis:
         
+        # Back2front compositing
         composited_image = processing.back_to_front_alphacomposite(torch.squeeze(mpi))
 
-        warped_image = composited_image
-
+        # Warping
+        warped_image = processing.homography(mpi, data)
+        
         warped_rgba_images.append(warped_image)
     
     # blending rgba_images together to get target_image
@@ -103,6 +105,7 @@ Test pipeline
 
 '''
 
+'''
 # read in the data
 #data_folder = "less_data/0cC7GPRFAIvP5i/"
 #LF = get_data.read_lightfield(data_folder)
@@ -157,6 +160,7 @@ for psv in psvs:
     optimizer.zero_grad()
 
     mpis = model(psv)
+    
 
     target_image = get_target_image(mpis)
     gt_image = torch.rand((3,64,64), requires_grad=True)
@@ -184,3 +188,4 @@ for psv in psvs:
 #plt.show()
 #plt.imshow(reproduce_img)
 #plt.show()
+'''

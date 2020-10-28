@@ -38,10 +38,15 @@ class MPIPredictionNet(nn.Module):
 
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
+        #self.softmax = nn.Softmax(dim=4)
         self.softmax = nn.Softmax()
 
-    def forward(self, psv):
-        c1_1 = self.relu(self.conv1_1(psv))
+    def forward(self, psvs):
+
+        # layern normalization
+        #TODO m = nn.LayerNorm(psvs.size()[1:])
+
+        c1_1 = self.relu(self.conv1_1(psvs))
         c1_2 = self.relu(self.conv1_2(c1_1))
         c2_1 = self.relu(self.conv2_1(c1_2))
         c2_2 = self.relu(self.conv2_2(c2_1))
@@ -81,9 +86,9 @@ class MPIPredictionNet(nn.Module):
         
         # Output tensor is of dimension batch_size x parameters(5) x height x width x depth; 5 parameters: r,g,b,a,all-0
         alpha = self.sigmoid(params[0])
-        r = self.softmax(params[1])
-        g = self.softmax(params[2])
-        b = self.softmax(params[3])
+        r = self.sigmoid(params[1])
+        g = self.sigmoid(params[2])
+        b = self.sigmoid(params[3])
 
         # Stack together
         mpis = torch.squeeze(torch.stack((r, g, b, alpha), dim=1))

@@ -21,11 +21,13 @@ if(torch.cuda.is_available() == True):
     device = torch.device('cuda:0')
 
 'Parameters'
-torch.manual_seed(0)
+#torch.manual_seed(0)
 relative_path_to_results = 'results'
 relative_path_to_scenes = 'less_data'
-max_epochs = 3
+max_epochs = 10
 validation_split = .2
+val_interval = 2
+layers = 8
 
 'Create folder structure'
 if(not os.path.isdir(relative_path_to_results)):
@@ -36,6 +38,7 @@ if(not os.path.isdir(relative_path_to_results)):
     os.mkdir(relative_path_to_results + '/images')
 assert os.path.isdir(relative_path_to_scenes)
 
+
 'Example dataset'
 #TODO add all scenes from dataset 
 all_scenes = list()
@@ -44,6 +47,10 @@ all_scenes.append('1eTVjMYXkOBq6b')
 all_scenes.append('1eTVjMYXkOBq6b')
 num_scenes = len(all_scenes)
 all_ids = dataset_processing.generate_all_ids(all_scenes)
+
+'Create PSV dataset (only once necessary' 
+#for scene in all_scenes:
+#    processing.create_psv_dataset(relative_path_to_scenes + '/' + scene, layers=layers)
 
 'Create customized pytorch dataset'
 random_seed = 42
@@ -94,7 +101,7 @@ for epoch in range(max_epochs):
             psvs.to(device)
             target_image.to(device)
         mpis = model(psvs)
-        loss = loss_function(target_image, pipeline.get_target_image(mpis))
+        loss = loss_function(target_image, pipeline.get_target_image(mpis, data))
         loss.backward()
         optimizer.step()
         epoch_loss += loss.item()
@@ -110,8 +117,7 @@ for epoch in range(max_epochs):
     print(f"Summary | Training | Epoch {epoch + 1}/{max_epochs} | Average loss {epoch_loss:.4f}")
 
 
-    'Validate for every 10th epoch'
-    val_interval = 2
+    'Validate for every val_interval epoch'
     if (epoch + 1) % val_interval == 0:
         model.eval()
         with torch.no_grad():
@@ -140,7 +146,7 @@ for epoch in range(max_epochs):
             if(val_loss<best_metric):
                 best_metric = val_loss
                 best_metric_epoch = epoch
-                torch.save(model.state_dict(), relative_path_to_results + '/model/'+ str(epoch) +'_best_metric_model.pth')
+                torch.save(model.state_dict(), relative_path_to_results + '/model/epoch_'+ str(epoch) +'_best_metric_model.pth')
                 print('Saved new best metric model')
                     
 
@@ -149,7 +155,7 @@ for epoch in range(max_epochs):
             print(f"Current metric {val_loss:.4f} | Best metric {best_metric:.4f} (Epoch {best_metric_epoch + 1}/{max_epochs})")
 
     if (epoch == 0):
-        torch.save(model.state_dict(), relative_path_to_results + '/model/'+ str(epoch) +'_best_metric_model.pth')
+        torch.save(model.state_dict(), relative_path_to_results + '/model/epoch_'+ str(epoch) +'_best_metric_model.pth')
         print('Saved model after one epoch for testing')
 
 'Save metrics'
