@@ -8,7 +8,6 @@ import small_net
 import large_net
 import matplotlib.pyplot as plt
 import numpy as np
-import pipeline
 import json
 from torch.utils.data.sampler import SubsetRandomSampler
 
@@ -101,7 +100,7 @@ for epoch in range(max_epochs):
             psvs.to(device)
             target_image.to(device)
         mpis = model(psvs)
-        loss = loss_function(target_image, pipeline.get_target_image(mpis, data))
+        loss = loss_function(target_image, processing.get_target_image(mpis, data))
         loss.backward()
         optimizer.step()
         epoch_loss += loss.item()
@@ -132,7 +131,7 @@ for epoch in range(max_epochs):
                     psvs.to(device)
                     target_image.to(device)
                 mpis = model(psvs)
-                predicted_target_image = pipeline.get_target_image(mpis)
+                predicted_target_image = processing.get_target_image(mpis, data)
                 loss = loss_function(target_image, predicted_target_image)
                 processing.save_images(relative_path_to_results, target_image, predicted_target_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
                 val_loss += loss.item()

@@ -73,25 +73,22 @@ def render_image(alpha, rgb, target_pose, input_poses):
 
 def get_target_image(mpis, data):
 
-    warped_rgba_images = list()
-    
+    mpi_images = list()
+
+    # warp every mpi slice into target perspective
+    warped_mpis = processing.homography(mpis, data)
+
     # split tensor in single mpis
-    mpis = torch.split(mpis, split_size_or_sections=1, dim=0)
-
-    # for every mpi do back-to-front-alpha-compositing and warping into target perspective
-    for mpi in mpis:
+    warped_mpis_split = torch.split(warped_mpis, split_size_or_sections=1, dim=0)
         
-        # Back2front compositing
+    # Back2front compositing
+    for mpi in warped_mpis_split:
         composited_image = processing.back_to_front_alphacomposite(torch.squeeze(mpi))
-
-        # Warping
-        warped_image = processing.homography(mpi, data)
-        
-        warped_rgba_images.append(warped_image)
+        mpi_images.append(composited_image)
     
     # blending rgba_images together to get target_image
-    warped_rgba_images = torch.squeeze(torch.stack(warped_rgba_images, dim=0))
-    target_image = processing.blending_images_ourspecialcase(warped_rgba_images)
+    mpi_images = torch.squeeze(torch.stack(mpi_images, dim=0))
+    target_image = processing.blending_images_ourspecialcase(mpi_images)
     
     return target_image
 

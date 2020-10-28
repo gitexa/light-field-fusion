@@ -100,12 +100,19 @@ def save_psvs(psvs, min_disps, bin_sizes,param, data_folder, scene_number):
     
     for i in range(9):
         for j in range(9):
-            
-            imgpath = str(scene_number)+str(i)+str(j)+'.pt'
+            coords = dataset_processing.parse_coordinates2camsnumbering((i,j))
+            imgpath = str(scene_number)+ coords +'.pt'
+            print(imgpath)
             path = os.path.join(data_folder, imgpath)
-            torch.save( [psvs[i,j].clone(), min_disps[i,j].clone(), bin_sizes[i,j].clone(), param] , path )
-    
-    
+
+            psv_package = dict()
+            psv_package['psv'] = psvs[i,j].clone()
+            psv_package['min_disp'] = min_disps[i,j].clone()
+            psv_package['bin_size'] = bin_sizes[i,j].clone()
+
+            torch.save(psv_package, path)
+            #torch.save( [psvs[i,j].clone(), min_disps[i,j].clone(), bin_sizes[i,j].clone(), param] , path )
+
 	
 	
 # This function is the important one
@@ -127,7 +134,30 @@ def create_psv_dataset(data_folder, scene_number, layers=8):
     
     
     
+# Function to get target_image from predicted MPIs by warping and alpha-compositing one image from each MPI in target view and blending them to one final target_image by equation 8 
+# Input: prediced MPIs
+# Output: target view 
+
+def get_target_image(mpis, data):
+
+    mpi_images = list()
+
+    # warp every mpi slice into target perspective
+    warped_mpis = processing.homography(mpis, data)
+
+    # split tensor in single mpis
+    warped_mpis_split = torch.split(warped_mpis, split_size_or_sections=1, dim=0)
+        
+    # Back2front compositing
+    for mpi in warped_mpis_split:
+        composited_image = processing.back_to_front_alphacomposite(torch.squeeze(mpi))
+        mpi_images.append(composited_image)
     
+    # blending rgba_images together to get target_image
+    mpi_images = torch.squeeze(torch.stack(mpi_images, dim=0))
+    target_image = processing.blending_images_ourspecialcase(mpi_images)
+    
+    return target_image   
     
     
     
@@ -269,12 +299,13 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 # function to perform the homography warp 
 
-
-def homography(input_dict):
+def homography(mpis, input_dict):
   
-    mpi1 = input_dict['psvs'][0]
-    mpi2 = input_dict['psvs'][1]
-    
+    #mpi1 = input_dict['psvs'][0]
+    #mpi2 = input_dict['psvs'][1]
+    mpi1 = mpis[0]
+    mpi2 = mpis[1]
+
     
     baseline = input_dict['baselineMM']
     focal_length = input_dict['focalLength']
@@ -285,7 +316,6 @@ def homography(input_dict):
     
     disparity_factor = focal_length * baseline * (512./sensor_size.astype(float)) / 1000.
 
-    
     mpi1_pos = input_dict['psv_center_1_pose']
     target_pos = input_dict['target_image_pose']
     
@@ -333,12 +363,13 @@ def blending_images_ourspecialcase(rgba):
     return target_view
 
 def save_images(relative_path_to_results, target_image, predicted_target_image, sample_id, target_image_pose, epoch, loss):
-    path_target_image = relative_path_to_results + '/images/' + str(sample_id) + '_' + str(target_image_pose) + '_epoch' + str(epoch) + '_target_image.png'
-    path_predicted_image = relative_path_to_results + '/images/' + str(sample_id) + '_' + str(target_image_pose) + '_epoch_' + str(epoch) + '_loss_' + str(loss) + '_predicted_image.png'
+    path_target_image = relative_path_to_results + '/images/' + str(sample_id) + '_target_pose_' + str(target_image_pose) + '_epoch' + str(epoch) + '_target_image.png'
+    path_predicted_image = relative_path_to_results + '/images/' + str(sample_id) + '_target_pose_' + str(target_image_pose) + '_epoch_' + str(epoch) + '_predicted_image_loss_' + str(loss) + '.png'
 
     utils.save_image(tensor=target_image, fp=path_target_image)
     utils.save_image(tensor=predicted_target_image, fp=path_predicted_image)
 
+        
         
         
 
