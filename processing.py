@@ -310,44 +310,55 @@ def homography(mpis, input_dict):
     baseline = input_dict['baselineMM']
     focal_length = input_dict['focalLength']
     sensor_size = input_dict['sensorWidthMM'] 
-    min_disp = input_dict["min_disp"]
-    bin_size = input_dict["bin_size"]
+    min_disp1 = input_dict['mpi_1_min_disp'] 
+    min_disp2 = input_dict['mpi_2_min_disp'] 
+    bin_size1 = input_dict['mpi_1_bin_size'] 
+    bin_size2 = input_dict['mpi_2_bin_size'] 
     focus_dist = input_dict["focus_distance_m"].astype(float)
     
     disparity_factor = focal_length * baseline * (512./sensor_size.astype(float)) / 1000.
 
     mpi1_pos = input_dict['psv_center_1_pose']
+    mpi2_pos = input_dict['psv_center_2_pose']
     target_pos = input_dict['target_image_pose']
     
     #warp the first image
     target_mpi1 = torch.zeros((4,512,512,layers))
     target_mpi2 = torch.zeros((4,512,512,layers))
     
-    camera_xDiff = (mpi1_pos[0]-target_pos[0])
-    camera_yDiff = (mpi1_pos[1]-target_pos[1])
+    camera_xDiff1 = (mpi1_pos[0]-target_pos[0])
+    camera_yDiff1 = (mpi1_pos[1]-target_pos[1])
+	
+    camera_xDiff2 = (mpi2_pos[0]-target_pos[0])
+    camera_yDiff2 = (mpi2_pos[1]-target_pos[1])
     
     for d in range(layers):
-        xdisparity = int((d*bin_size + min_disp - 1/focus_dist)*disparity_factor*camera_xDiff)
-        ydisparity = int((d*bin_size + min_disp - 1/focus_dist)*disparity_factor*camera_yDiff)
+        xdisparity1 = int((d*bin_size1 + min_disp1 - 1/focus_dist)*disparity_factor*camera_xDiff1)
+        ydisparity1 = int((d*bin_size1 + min_disp1 - 1/focus_dist)*disparity_factor*camera_yDiff1)
+	
+        xdisparity2 = int((d*bin_size2 + min_disp2 - 1/focus_dist)*disparity_factor*camera_xDiff2)
+        ydisparity2 = int((d*bin_size2 + min_disp2 - 1/focus_dist)*disparity_factor*camera_yDiff2)
         
-        if xdisparity >= 0 and ydisparity >= 0:
-            target_mpi1[:,:-xdisparity,:-ydisparity,d] = mpi1[:,xdisparity:,ydisparity:,d]
-            target_mpi2[:,xdisparity:,ydisparity:,d] = mpi2[:,:-xdisparity,:-ydisparity,d]
-            return torch.stack(target_mpi1, target_mpi2, dim=0)
-        if xdisparity >= 0 and ydisparity < 0:
-            target_mpi1[:,:-xdisparity,:ydisparity,d] = mpi1[:,xdisparity:,-ydisparity:,d]
-            target_mpi2[:,xdisparity:,-ydisparity:,d] = mpi2[:,:-xdisparity,:ydisparity,d]
-            return torch.stack(target_mpi1, target_mpi2, dim=0)
-        if xdisparity < 0 and ydisparity >= 0:
-            target_mpi1[:,:xdisparity,:-ydisparity,d] = mpi1[:,-xdisparity:,ydisparity:,d]
-            target_mpi2[:,-xdisparity:,ydisparity:,d] = mpi2[:,:xdisparity,:-ydisparity,d]
-            return torch.stack(target_mpi1, target_mpi2, dim=0)
-        if xdisparity < 0 and ydisparity < 0:
-            target_mpi1[:,:xdisparity,:ydisparity,d] = mpi1[:,-xdisparity:,-ydisparity:,d]
-            target_mpi2[:,-xdisparity:,ydisparity:,d] = mpi2[:,:xdisparity,:-ydisparity,d]
-            return torch.stack(target_mpi1, target_mpi2, dim=0)
-        
-        
+        if xdisparity1 >= 0 and ydisparity1 >= 0:
+            target_mpi1[:,:-xdisparity1,:-ydisparity1,d] = mpi1[:,xdisparity1:,ydisparity1:,d]
+        if xdisparity1 >= 0 and ydisparity1 < 0:
+            target_mpi1[:,:-xdisparity1,:ydisparity1,d] = mpi1[:,xdisparity1:,-ydisparity1:,d]
+        if xdisparity1 < 0 and ydisparity1 >= 0:
+            target_mpi1[:,:xdisparity1,:-ydisparity1,d] = mpi1[:,-xdisparity1:,ydisparity1:,d]
+        if xdisparity1 < 0 and ydisparity1 < 0:
+            target_mpi1[:,:xdisparity1,:ydisparity1,d] = mpi1[:,-xdisparity1:,-ydisparity1:,d]
+
+        if xdisparity2 >= 0 and ydisparity2 >= 0:
+            target_mpi2[:,:-xdisparity2,:-ydisparity2,d] = mpi1[:,xdisparity2:,ydisparity2:,d]
+        if xdisparity2 >= 0 and ydisparity2 < 0:
+            target_mpi2[:,:-xdisparity2,:ydisparity2,d] = mpi1[:,xdisparity2:,-ydisparity2:,d]
+        if xdisparity2 < 0 and ydisparity2 >= 0:
+            target_mpi2[:,:xdisparity2,:-ydisparity2,d] = mpi1[:,-xdisparity2:,ydisparity2:,d]
+        if xdisparity2 < 0 and ydisparity2 < 0:
+            target_mpi2[:,:xdisparity2,:ydisparity2,d] = mpi1[:,-xdisparity2:,-ydisparity2:,d]
+	
+    return torch.stack([target_mpi1, target_mpi2] ,dim=0)    
+    
 
 def blending_images_ourspecialcase(rgba):
 
