@@ -17,7 +17,8 @@ def create_disp_tensor(depth_map, layers):
     assert type(layers) == int, 'layers needs to be integer'
 
 	# convert the depth to disparity
-    disp_map = 1./depth_map.float()
+    disp_map = 1./(depth_map.float())
+
 
     #get the min_disparity and the max_disparity
     min_disp = torch.min(disp_map)*0.999999
@@ -27,8 +28,7 @@ def create_disp_tensor(depth_map, layers):
     bin_size  = (max_disp-min_disp)/layers
 
     #get the disparity_layer for every pixel
-    disp_layers = layers - 1 - (disp_map-min_disp/bin_size).int()
-
+    disp_layers = layers - 1 - ((disp_map-min_disp)/bin_size).int()
     #convert to 3d 1-hot-encoding disparity_tensor (512,512,layers)
     disp_tensor = (torch.arange(layers) == disp_layers[...,None]).int()
     
@@ -94,7 +94,7 @@ def dataset_into_psvs(data_folder, layers=8):
     # 9x9x3x512x512x8 PSV tensor
     # 9x9x1 Min_disp of every image
     # scene parameters
-    return psvs, min_disps, param
+    return psvs, min_disps, bin_sizes, param
 
 def save_psvs(psvs, min_disps, bin_sizes,param, data_folder, scene_number):
     
@@ -122,6 +122,7 @@ def create_psv_dataset(data_folder, scene_number, layers=8):
     psvs, min_disps, bin_sizes, param = dataset_into_psvs(data_folder, layers)
     
     save_psvs( psvs, min_disps, bin_sizes, param, data_folder, scene_number)
+    
     
     
     
@@ -267,58 +268,54 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 
 # function to perform the homography warp 
-# inputs:
-# mpi (4x512x512xdepth)
-# input_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
-# output_pos on the 9x9 camera lattice, starting from [0,0] topleft to [8,8] bottom right
+
 
 def homography(input_dict):
   
-    mpi = input_dict["mpi"]
+    mpi1 = input_dict['psvs'][0]
+    mpi2 = input_dict['psvs'][1]
     
-    # Note: camera parameters that needed to be given to the function somehow
-    # baselineMM
-    # focalLength
-    # SensorWidthMM
-    # ImageSize 512,512
-    # Disparity Scaling to correct for the real depth
     
-    baseline = input_dict["baseline"]
-    focal_length = input_dict["focal_length"]
-    sensor_size = input_dict["sensor_size"]
+    baseline = input_dict['baselineMM']
+    focal_length = input_dict['focalLength']
+    sensor_size = input_dict['sensorWidthMM'] 
     min_disp = input_dict["min_disp"]
     bin_size = input_dict["bin_size"]
-    
-    
-    mpi_pos = input_dict["mpi_pos"]
-    target_pos = input_dict["target_pos"]
-    
-    camera_xDiff = (mpi_pos[0]-target_pos[0])
-    camera_yDiff = (mpi_pos[1]-target_pos[1])
+    focus_dist = input_dict["focus_distance_m"].astype(float)
     
     disparity_factor = focal_length * baseline * (512./sensor_size.astype(float)) / 1000.
 
-    target_mpi = torch.zeros((4,512,512,layers))
     
-    if camera_xDiff > 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_xDiff))
-            target_mpi[:,:-disparity,:,d] = mpi[:,disparity:,:,d]
-    if camera_xDiff <= 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_xDiff))
-            target_mpi[:,disparity:,:,d] = mpi[:,:-disparity,:,d]   
-            
-    if camera_yDiff > 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_yDiff))
-            target_mpi[:,:,:-disparity,d] = mpi[:,:,disparity:,d]
-    if camera_yDiff <= 0: 
-        for d in range(layers):
-            disparity = int((d*bin_size + min_disp)*disparity_factor*abs(camera_yDiff))
-            target_mpi[:,:,disparity:,d] = mpi[:,:,:-disparity,d]
-            
-    return target_mpi
+    mpi1_pos = input_dict['psv_center_1_pose']
+    target_pos = input_dict['target_image_pose']
+    
+    #warp the first image
+    target_mpi1 = torch.zeros((4,512,512,layers))
+    target_mpi2 = torch.zeros((4,512,512,layers))
+    
+    camera_xDiff = (mpi1_pos[0]-target_pos[0])
+    camera_yDiff = (mpi1_pos[1]-target_pos[1])
+    
+    for d in range(layers):
+        xdisparity = int((d*bin_size + min_disp - 1/focus_dist)*disparity_factor*camera_xDiff)
+        ydisparity = int((d*bin_size + min_disp - 1/focus_dist)*disparity_factor*camera_yDiff)
+        
+        if xdisparity >= 0 and ydisparity >= 0:
+            target_mpi1[:,:-xdisparity,:-ydisparity,d] = mpi1[:,xdisparity:,ydisparity:,d]
+            target_mpi2[:,xdisparity:,ydisparity:,d] = mpi2[:,:-xdisparity,:-ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
+        if xdisparity >= 0 and ydisparity < 0:
+            target_mpi1[:,:-xdisparity,:ydisparity,d] = mpi1[:,xdisparity:,-ydisparity:,d]
+            target_mpi2[:,xdisparity:,-ydisparity:,d] = mpi2[:,:-xdisparity,:ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
+        if xdisparity < 0 and ydisparity >= 0:
+            target_mpi1[:,:xdisparity,:-ydisparity,d] = mpi1[:,-xdisparity:,ydisparity:,d]
+            target_mpi2[:,-xdisparity:,ydisparity:,d] = mpi2[:,:xdisparity,:-ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
+        if xdisparity < 0 and ydisparity < 0:
+            target_mpi1[:,:xdisparity,:ydisparity,d] = mpi1[:,-xdisparity:,-ydisparity:,d]
+            target_mpi2[:,-xdisparity:,ydisparity:,d] = mpi2[:,:xdisparity,:-ydisparity,d]
+            return torch.stack(target_mpi1, target_mpi2, dim=0)
         
         
 
