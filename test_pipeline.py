@@ -27,6 +27,8 @@ max_epochs = 10
 validation_split = .2
 val_interval = 2
 layers = 8
+image_size = (64,64)
+
 
 'Create folder structure'
 if(not os.path.isdir(relative_path_to_results)):
@@ -41,6 +43,7 @@ assert os.path.isdir(relative_path_to_scenes)
 'Example dataset'
 #TODO add all scenes from dataset 
 all_scenes = list()
+
 all_scenes.append('0cC7GPRFAIvP5i')
 all_scenes.append('1eTVjMYXkOBq6b')
 all_scenes.append('1eTVjMYXkOBq6b')
@@ -53,7 +56,7 @@ all_ids = dataset_processing.generate_all_ids(all_scenes)
 
 'Create customized pytorch dataset'
 random_seed = 42
-all_data = dataset.Dataset(all_ids, relative_path_to_scenes)
+all_data = dataset.Dataset(all_ids, relative_path_to_scenes, layers)
 all_data_size = len(all_data)
 indices = list(range(all_data_size))
 split = int(np.floor(validation_split * all_data_size))

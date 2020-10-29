@@ -11,11 +11,12 @@ Pytorch Dataset Class
 '''
 class Dataset(torch.utils.data.Dataset):
     'Characterizes a dataset for PyTorch'
-    def __init__(self, ids, path_to_data):
+    def __init__(self, ids, path_to_data, layers):
         
         'Initialization'
         self.ids = ids #all ids, scene_id_psv_id
         self.path_to_data = path_to_data
+        self.layers = layers
 
     def __len__(self):
         'Denotes the total number of samples'
@@ -39,7 +40,7 @@ class Dataset(torch.utils.data.Dataset):
         target_image_coords = dataset_processing.get_target_image_coords(mpi_1_coords, mpi_2_coords)
 
         # Get config data
-        baselineMM, focalLength, sensorWidth = dataset_processing.load_config_from_disk(self.path_to_data, scene_dir)
+        baselineMM, focalLength, sensorWidth, focus_distance_m= dataset_processing.load_config_from_disk(self.path_to_data, scene_dir)
         
         # Scene parameters
         sample['sample_id'] = id
@@ -47,8 +48,11 @@ class Dataset(torch.utils.data.Dataset):
         sample['baselineMM'] = baselineMM
         sample['focalLength'] = focalLength
         sample['sensorWidthMM'] = sensorWidth
+        sample['focus_distance_m'] = focus_distance_m
+        sample['layers'] = self.layers
 
         #TODO binsize, mindisp
+        
         # MPI 1 metadata
         sample['mpi_1_bin_size'] = mpi_1_bin_size
         sample['mpi_1_min_disp'] = mpi_1_min_disp

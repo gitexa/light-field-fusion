@@ -169,11 +169,11 @@ def load_psvs_from_disk(path_to_data, scene_dir, psv_coords):
 
     #TODO: load correct PSV and assert psv to be psv/tensor
     psv_package = torch.load(path)
-    psv = psv_package['psv']
+    #psv = psv_package['psv']
     min_disp = psv_package['min_disp']
     bin_size = psv_package['bin_size']
 
-    #psv = torch.rand(3,64,64,8)
+    psv = torch.rand(3,64,64,8)
 
     return psv, min_disp, bin_size
 
@@ -184,8 +184,10 @@ def load_config_from_disk(path_to_data, scene_dir):
     baselineMM = config.getfloat('extrinsics', 'baseline_mm')
     focalLength = config.getfloat('intrinsics', 'focal_length_mm')
     sensorWidth = config.getfloat('intrinsics', 'sensor_size_mm')
+    focus_distance_m = config.getfloat('extrinsics', 'focus_distance_m')
 
-    return baselineMM, focalLength, sensorWidth
+
+    return baselineMM, focalLength, sensorWidth, focus_distance_m
 
 
 def get_target_image_from_disk(path_to_data, scene_dir, target_image_coords):
