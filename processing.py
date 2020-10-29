@@ -299,7 +299,7 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 # function to perform the homography warp 
 
-def homography(mpis, input_dict):
+def homography2(mpis, input_dict):
   
     #mpi1 = input_dict['psvs'][0]
     #mpi2 = input_dict['psvs'][1]
@@ -344,14 +344,18 @@ def homography(mpis, input_dict):
             if xdisparity1 >0:
                 target_mpi1[:,:-xdisparity1,:,d] = mpi1[:,xdisparity1:,:,d]
             elif xdisparity1 < 0:
-                target_mpi1[:,:xdisparity1,:,d] = mpi1[:,-xdisparity1:,:,d]
+                
+                
+                target_mpi1[:,-xdisparity1:,:,d] = mpi1[:,:xdisparity1,:,d]
             else:
                 target_mpi1[:,:,:,d]=mpi1[:,:,:,d]
                
             if xdisparity2 >0:
                 target_mpi2[:,:-xdisparity2,:,d] = mpi2[:,xdisparity2:,:,d]
             elif xdisparity2 < 0:
-                target_mpi2[:,:xdisparity2,:,d] = mpi2[:,-xdisparity2:,:,d]
+                
+                
+                target_mpi2[:,-xdisparity2:,:,d] = mpi2[:,:xdisparity2,:,d]
             else:
                 target_mpi2[:,:,:,d]=mpi2[:,:,:,d]
         return torch.stack([target_mpi1, target_mpi2] , dim=0)
@@ -363,16 +367,18 @@ def homography(mpis, input_dict):
             ydisparity2 = int(((layers-1-d)*bin_size2 + min_disp2 - (1/focus_dist))*disparity_factor*camera_yDiff2)
 
             if ydisparity1 >0:
-                target_mpi1[:,:,:-ydisparity1,d] = mpi1[:,:,ydisparity1:,d]
+                target_mpi1[:,:,ydisparity1:,d] = mpi1[:,:,:-ydisparity1,d]
             elif ydisparity1 < 0:
-                target_mpi1[:,:,-ydisparity1:,d] = mpi1[:,:,:ydisparity1,d]
+                
+                target_mpi1[:,:,:ydisparity1,d] = mpi1[:,:,-ydisparity1:,d]
             else:
                 target_mpi1[:,:,:,d]=mpi1[:,:,:,d]
                 
             if ydisparity2 >0:
-                target_mpi2[:,:,:-ydisparity2,d] = mpi2[:,:,ydisparity2:,d]
+                target_mpi2[:,:,ydisparity2:,d] = mpi2[:,:,:-ydisparity2,d]
             elif ydisparity2 < 0:
-                target_mpi2[:,:,-ydisparity2:,d] = mpi2[:,:,:ydisparity2,d]
+                
+                target_mpi2[:,:,:ydisparity2,d] = mpi2[:,:,-ydisparity2:,d]
             else:
                 target_mpi2[:,:,:,d]=mpi2[:,:,:,d]
         return torch.stack([target_mpi1, target_mpi2] , dim=0)
