@@ -299,7 +299,7 @@ def render_target_view(alphas, rgbs, p_target, poses):
 
 # function to perform the homography warp 
 
-def homography2(mpis, input_dict):
+def homography(mpis, input_dict):
   
     #mpi1 = input_dict['psvs'][0]
     #mpi2 = input_dict['psvs'][1]
