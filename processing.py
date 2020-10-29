@@ -2,6 +2,7 @@ from PIL.Image import alpha_composite
 import torch
 from torchvision import transforms
 from torchvision import utils
+import dataset_processing
 import h5py
 import pickle
 import os
@@ -61,7 +62,6 @@ def create_psv(image, disp_tensor, layers):
     assert len(image.shape)==3, 'Image must be 3x512x512'
     assert image.shape[0]==3, 'Image must be 3x512x512'
 
-    
     output=torch.zeros((3,512,512,layers))
     
     for d in range(layers):
@@ -112,7 +112,6 @@ def save_psvs(psvs, min_disps, bin_sizes,param, data_folder, scene_number):
 
             torch.save(psv_package, path)
             #torch.save( [psvs[i,j].clone(), min_disps[i,j].clone(), bin_sizes[i,j].clone(), param] , path )
-
 	
 	
 # This function is the important one
@@ -124,13 +123,11 @@ def save_psvs(psvs, min_disps, bin_sizes,param, data_folder, scene_number):
 # The function reads in the 9x9x512x512 depth-layer tensor and the 9x9x3x512x512 image tensor
 # It safes 81 .pt files containing data of the form [PSV, Min_disp, bin_size, param]
 # These can be loaded individually with        psv, min_disp,bin_size, param = torch.load( ... the path ...)
-def create_psv_dataset(data_folder, scene_number, layers=8):
+def create_psv_dataset(data_folder, scene_number='psv_', layers=8):
     
     psvs, min_disps, bin_sizes, param = dataset_into_psvs(data_folder, layers)
     
     save_psvs( psvs, min_disps, bin_sizes, param, data_folder, scene_number)
-    
-    
     
     
     
