@@ -305,6 +305,7 @@ def homography(mpis, input_dict):
     #mpi2 = input_dict['psvs'][1]
     mpi1 = mpis[0]
     mpi2 = mpis[1]
+    layers = mpi1.shape[-1]
 
     
     baseline = input_dict['baselineMM']
@@ -332,32 +333,47 @@ def homography(mpis, input_dict):
     camera_xDiff2 = (mpi2_pos[0]-target_pos[0])
     camera_yDiff2 = (mpi2_pos[1]-target_pos[1])
     
-    for d in range(layers):
-        xdisparity1 = int((d*bin_size1 + min_disp1 - 1/focus_dist)*disparity_factor*camera_xDiff1)
-        ydisparity1 = int((d*bin_size1 + min_disp1 - 1/focus_dist)*disparity_factor*camera_yDiff1)
-	
-        xdisparity2 = int((d*bin_size2 + min_disp2 - 1/focus_dist)*disparity_factor*camera_xDiff2)
-        ydisparity2 = int((d*bin_size2 + min_disp2 - 1/focus_dist)*disparity_factor*camera_yDiff2)
-        
-        if xdisparity1 >= 0 and ydisparity1 >= 0:
-            target_mpi1[:,:-xdisparity1,:-ydisparity1,d] = mpi1[:,xdisparity1:,ydisparity1:,d]
-        if xdisparity1 >= 0 and ydisparity1 < 0:
-            target_mpi1[:,:-xdisparity1,:ydisparity1,d] = mpi1[:,xdisparity1:,-ydisparity1:,d]
-        if xdisparity1 < 0 and ydisparity1 >= 0:
-            target_mpi1[:,:xdisparity1,:-ydisparity1,d] = mpi1[:,-xdisparity1:,ydisparity1:,d]
-        if xdisparity1 < 0 and ydisparity1 < 0:
-            target_mpi1[:,:xdisparity1,:ydisparity1,d] = mpi1[:,-xdisparity1:,-ydisparity1:,d]
+    if cameraxDiff1 != 0:
+    	for d in range(layers):
+        	xdisparity1 = int((d*bin_size1 + min_disp1 - 1/focus_dist)*disparity_factor*camera_xDiff1)
+        	xdisparity2 = int((d*bin_size2 + min_disp2 - 1/focus_dist)*disparity_factor*camera_xDiff2)
 
-        if xdisparity2 >= 0 and ydisparity2 >= 0:
-            target_mpi2[:,:-xdisparity2,:-ydisparity2,d] = mpi1[:,xdisparity2:,ydisparity2:,d]
-        if xdisparity2 >= 0 and ydisparity2 < 0:
-            target_mpi2[:,:-xdisparity2,:ydisparity2,d] = mpi1[:,xdisparity2:,-ydisparity2:,d]
-        if xdisparity2 < 0 and ydisparity2 >= 0:
-            target_mpi2[:,:xdisparity2,:-ydisparity2,d] = mpi1[:,-xdisparity2:,ydisparity2:,d]
-        if xdisparity2 < 0 and ydisparity2 < 0:
-            target_mpi2[:,:xdisparity2,:ydisparity2,d] = mpi1[:,-xdisparity2:,-ydisparity2:,d]
-	
-    return torch.stack([target_mpi1, target_mpi2] ,dim=0)    
+        
+        	if xdisparity1 >0:
+            		target_mpi1[:,:-xdisparity1,:,d] = mpi1[:,xdisparity1:,:,d]
+			elif xdisparity1 < 0:
+				target_mpi1[:,:xdisparity1,:,d] = mpi1[:,-xdisparity1:,:,d]
+			else:
+				target_mpi1[:,:,:,d]=mpi1[:,:,:,d]
+        	if xdisparity2 >0:
+            		target_mpi2[:,:-xdisparity2,:,d] = mpi2[:,xdisparity2:,:,d]
+			elif xdisparity2 < 0:
+				target_mpi2[:,:xdisparity2,:,d] = mpi2[:,-xdisparity2:,:,d]
+			else:
+				target_mpi2[:,:,:,d]=mpi2[:,:,:,d]
+	return torch.stack([target_mpi1, target_mpi2] , dim=0)
+    else:
+    	for d in range(layers):
+        	ydisparity1 = int((d*bin_size1 + min_disp1 - 1/focus_dist)*disparity_factor*camera_yDiff1)
+        	ydisparity2 = int((d*bin_size2 + min_disp2 - 1/focus_dist)*disparity_factor*camera_yDiff2)
+
+        
+        	if ydisparity1 >0:
+            		target_mpi1[:,:,:-ydisparity1,d] = mpi1[:,:,ydisparity1:,d]
+			elif ydisparity1 < 0:
+				target_mpi1[:,:,:ydisparity1,d] = mpi1[:,:,-ydisparity1:,d]
+			else:
+				target_mpi1[:,:,:,d]=mpi1[:,:,:,d]
+        	if ydisparity2 >0:
+            		target_mpi2[:,:,:-ydisparity2,d] = mpi2[:,:,ydisparity2:,d]
+			elif ydisparity2 < 0:
+				target_mpi2[:,:,:ydisparity2,d] = mpi2[:,:,-ydisparity2:,d]
+			else:
+				target_mpi2[:,:,:,d]=mpi2[:,:,:,d]
+	return torch.stack([target_mpi1, target_mpi2] , dim=0)
+				
+
+
     
 
 def blending_images_ourspecialcase(rgba):
