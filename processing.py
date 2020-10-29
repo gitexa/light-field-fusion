@@ -143,19 +143,19 @@ def get_target_image(mpis, data):
     mpi_images = list()
 
     # warp every mpi slice into target perspective
-    warped_mpis = processing.homography(mpis, data)
+    warped_mpis = homography(mpis, data)
 
     # split tensor in single mpis
     warped_mpis_split = torch.split(warped_mpis, split_size_or_sections=1, dim=0)
         
     # Back2front compositing
     for mpi in warped_mpis_split:
-        composited_image = processing.back_to_front_alphacomposite(torch.squeeze(mpi))
+        composited_image = back_to_front_alphacomposite(torch.squeeze(mpi))
         mpi_images.append(composited_image)
     
     # blending rgba_images together to get target_image
     mpi_images = torch.squeeze(torch.stack(mpi_images, dim=0))
-    target_image = processing.blending_images_ourspecialcase(mpi_images)
+    target_image = blending_images_ourspecialcase(mpi_images)
     
     return target_image   
     
@@ -310,22 +310,22 @@ def homography(mpis, input_dict):
     
     baseline = input_dict['baselineMM']
     focal_length = input_dict['focalLength']
-    sensor_size = float(input_dict['sensorWidthMM'])
+    sensor_size = float(input_dict['sensorWidthMM']) 
     min_disp1 = input_dict['mpi_1_min_disp'] 
     min_disp2 = input_dict['mpi_2_min_disp'] 
     bin_size1 = input_dict['mpi_1_bin_size'] 
     bin_size2 = input_dict['mpi_2_bin_size'] 
     focus_dist = float(input_dict["focus_distance_m"])
-    
+
     disparity_factor = focal_length * baseline * (512./sensor_size) / 1000.
 
     mpi1_pos = input_dict['psv_center_1_pose']
     mpi2_pos = input_dict['psv_center_2_pose']
     target_pos = input_dict['target_image_pose']
     
-
-    target_mpi1 = torch.zeros((4,512,512,layers))
-    target_mpi2 = torch.zeros((4,512,512,layers))
+    #warp the first image
+    target_mpi1 = torch.zeros(mpi1.shape)
+    target_mpi2 = torch.zeros(mpi2.shape)
     
     camera_xDiff1 = (mpi1_pos[0]-target_pos[0])
     camera_yDiff1 = (mpi1_pos[1]-target_pos[1])
@@ -370,11 +370,9 @@ def homography(mpis, input_dict):
             elif ydisparity2 < 0:
                 target_mpi2[:,:,:ydisparity2,d] = mpi2[:,:,-ydisparity2:,d]
             else:
-                arget_mpi2[:,:,:,d]=mpi2[:,:,:,d]
+                target_mpi2[:,:,:,d]=mpi2[:,:,:,d]
         return torch.stack([target_mpi1, target_mpi2] , dim=0)
-
     
-
 def blending_images_ourspecialcase(rgba):
 
     w_t_1 = 0.5
