@@ -5,6 +5,7 @@ import torch
 import processing
 import get_data
 import small_net
+import reduced_net
 import large_net
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,17 +16,20 @@ from torch.utils.data.sampler import SubsetRandomSampler
 'Print method evokation'
 print('-' * 60)
 print('Started pipeline')
+print('-' * 60)
 print('Cuda?: ' + str(torch.cuda.is_available()))
 if(torch.cuda.is_available() == True):
     device = torch.device('cuda:0')
+else:
+    device = torch.device('cpu')
 
 'Parameters'
 #torch.manual_seed(0)
 relative_path_to_results = 'results'
-relative_path_to_scenes = 'less_data'
-max_epochs = 10
+relative_path_to_scenes = '/media/mkg/Elements/03_MLData/lightfields/all_lightfields'
+max_epochs = 250
 validation_split = .2
-val_interval = 2
+val_interval = 10
 layers = 8
 image_size = (64,64)
 
@@ -40,17 +44,18 @@ if(not os.path.isdir(relative_path_to_results)):
 assert os.path.isdir(relative_path_to_scenes)
 
 
-'Example dataset'
+'Read all scenes and generate all ids'
 #TODO add all scenes from dataset 
-all_scenes = list()
-
-all_scenes.append('0cC7GPRFAIvP5i')
-all_scenes.append('1eTVjMYXkOBq6b')
-all_scenes.append('1eTVjMYXkOBq6b')
-num_scenes = len(all_scenes)
+#all_scenes = list()
+#all_scenes.append('0cC7GPRFAIvP5i')
+#all_scenes.append('1eTVjMYXkOBq6b')
+#all_scenes.append('1eTVjMYXkOBq6b')
+all_scenes = dataset_processing.get_all_scenes(relative_path_to_scenes)
 all_ids = dataset_processing.generate_all_ids(all_scenes)
+num_scenes = len(all_scenes)
 
-'Create PSV dataset (only once necessary' 
+'Create PSV dataset (only once necessary)' 
+# Only once!!!
 #for scene in all_scenes:
 #    processing.create_psv_dataset(relative_path_to_scenes + '/' + scene, layers=layers)
 
@@ -69,7 +74,8 @@ training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler
 validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
 
 'Create model, loss function and optimizer'
-model = large_net.MPIPredictionNet()
+#model = large_net.MPIPredictionNet()
+model = reduced_net.MPIPredictionNet()
 if(torch.cuda.is_available() == True):
     model.to(device)
 loss_function = torch.nn.MSELoss()
@@ -78,7 +84,7 @@ optimizer = torch.optim.Adam(model.parameters(),lr=2e-4, amsgrad=True)
 'Loss for training and validation'
 training_epoch_loss_values = list()
 validation_epoch_loss_values = list()
-best_metric = 100 #TODO solve better
+best_metric = 100 #TODO random value, to be improved
 best_metric_epoch = 0
 
 'Start training process'
@@ -100,18 +106,23 @@ for epoch in range(max_epochs):
         optimizer.zero_grad()
         psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
         if(torch.cuda.is_available() == True):
-            psvs.to(device)
-            target_image.to(device)
+            psvs, target_image = psvs.to(device), target_image.to(device)
+
         mpis = model(psvs)
-        loss = loss_function(target_image, processing.get_target_image(mpis, data))
+        
+        predicted_image = processing.get_target_image(mpis, data)
+        if(torch.cuda.is_available() == True):
+            predicted_image = predicted_image.to(device)
+
+        loss = loss_function(target_image, predicted_image)
         loss.backward()
         optimizer.step()
         epoch_loss += loss.item()
         print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
 
         #TODO
-        if(step>10):
-            break
+        #if(step>10):
+        #    break
     
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
@@ -131,17 +142,21 @@ for epoch in range(max_epochs):
                 val_step += 1
                 psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
                 if(torch.cuda.is_available() == True):
-                    psvs.to(device)
-                    target_image.to(device)
+                    psvs, target_image = psvs.to(device), target_image.to(device)
+
                 mpis = model(psvs)
-                predicted_target_image = processing.get_target_image(mpis, data)
-                loss = loss_function(target_image, predicted_target_image)
-                processing.save_images(relative_path_to_results, target_image, predicted_target_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
+
+                predicted_image = processing.get_target_image(mpis, data)
+                if(torch.cuda.is_available() == True):
+                    predicted_image = predicted_image.to(device)
+                
+                loss = loss_function(target_image, predicted_image)
+                processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
                 val_loss += loss.item()
 
                 #TODO
-                if(val_step>10):
-                    break
+                #if(val_step>10):
+                #    break
             val_loss /= val_step
             validation_epoch_loss_values.append((epoch, val_loss))
 

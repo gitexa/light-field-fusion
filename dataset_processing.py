@@ -1,3 +1,4 @@
+import os
 import torch
 import configparser
 from PIL import Image
@@ -5,6 +6,20 @@ import torchvision.transforms as transforms
 
 
 'Helper Methods'
+def get_all_scenes(path):
+    
+    scenes = os.listdir(path)
+    all_scenes = list()
+    
+    # Loop to print each filename separately
+    for scene in scenes:
+        all_scenes.append(scene)
+    
+    scenes_count = len(all_scenes)
+    print(f"Found {scenes_count} scenes.")
+
+    return all_scenes
+
 
 
 def parse_camsnumbering2coordinates(number):
