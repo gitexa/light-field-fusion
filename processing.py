@@ -321,8 +321,8 @@ def homography(mpis, input_dict):
     target_pos = input_dict['target_image_pose']
     
     #warp the first image
-    target_mpi1 = torch.zeros((4,512,512,layers))
-    target_mpi2 = torch.zeros((4,512,512,layers))
+    target_mpi1 = torch.zeros(mpi1.shape)
+    target_mpi2 = torch.zeros(mpi2.shape)
     
     camera_xDiff1 = (mpi1_pos[0]-target_pos[0])
     camera_yDiff1 = (mpi1_pos[1]-target_pos[1])
