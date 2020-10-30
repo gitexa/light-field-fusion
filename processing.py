@@ -168,7 +168,7 @@ def naive_alpha(depth_tensor):
     assert len(depth_tensor.shape)==3, 'Depth tensor needs to be 512x512xdepth'
     depth = depth_tensor.shape[2]
     assert depth_tensor.shape == (512,512,depth), 'Depth tensor needs to be 512x512xdepth'
-    assert torch.allclose(torch.sum(depth_tensor, dim=2), torch.ones((512,512))), 'Depth tensor not normalized'
+    #assert torch.allclose(torch.sum(depth_tensor, dim=2), torch.ones((512,512))), 'Depth tensor not normalized'
     
     # Note: Add 4 units of 0-padding in depth direction for the boundary conditions
     zero_padding = torch.zeros((512,512,2))
@@ -185,7 +185,7 @@ def naive_alpha(depth_tensor):
     alpha           = alpha / sum_along_depth.unsqueeze(2)
     
     assert alpha.shape == (512,512,depth), 'Alpha Dimensionality failed'
-    assert torch.allclose(torch.sum(alpha, dim=2), torch.ones((512,512))), 'Alpha Normalization failed'
+    #assert torch.allclose(torch.sum(alpha, dim=2), torch.ones((512,512))), 'Alpha Normalization failed'
 
     
     return alpha
@@ -202,7 +202,7 @@ def rgba(image, depth_tensor):
     assert len(depth_tensor.shape)==3, 'Depth tensor needs to be 512x512xdepth'
     Depth = depth_tensor.shape[2]
     assert depth_tensor.shape == (512,512,Depth), 'Depth tensor needs to be 512x512xdepth'
-    assert torch.allclose(torch.sum(depth_tensor, dim=2), torch.ones((512,512))), 'Depth tensor not normalized'
+    #assert torch.allclose(torch.sum(depth_tensor, dim=2), torch.ones((512,512))), 'Depth tensor not normalized'
     
     assert len(image.shape)==3, 'Image must be 3x512x512'
     assert image.shape[0]==3, 'Image must be 3x512x512'
