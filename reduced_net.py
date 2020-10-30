@@ -34,10 +34,11 @@ class MPIPredictionNet(nn.Module):
         self.nnup7 = nn.Upsample(mode='nearest', scale_factor=(2,2,1))
         self.bn_nnup7 = nn.BatchNorm3d(32)
 
-        self.conv7_1 = nn.Conv3d(in_channels=32, out_channels=8, kernel_size=3, stride=1, padding=(1,1,1), dilation=1)
-        self.bn_c7_1 = nn.BatchNorm3d(8)
+        #self.conv7_1 = nn.Conv3d(in_channels=32, out_channels=8, kernel_size=3, stride=1, padding=(1,1,1), dilation=1)
+        self.conv7_1 = nn.Conv3d(in_channels=32, out_channels=4, kernel_size=3, stride=1, padding=(1,1,1), dilation=1)
+        #self.bn_c7_1 = nn.BatchNorm3d(8)
 
-        self.conv7_3 = nn.Conv3d(in_channels=8, out_channels=4, kernel_size=3, stride=1, padding=(1,1,1), dilation=1)
+        #self.conv7_3 = nn.Conv3d(in_channels=8, out_channels=4, kernel_size=3, stride=1, padding=(1,1,1), dilation=1)
 
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
@@ -68,13 +69,17 @@ class MPIPredictionNet(nn.Module):
 
         c6_1 = self.relu(self.bn_c6_1(self.conv6_1(nnup6)))
 
+        #print(torch.cuda.memory_summary(device=None, abbreviated=False))
+
         # 2xnearest neighbour upsampling?
         concat_nnup7 = torch.cat((c6_1, c1_2), dim=1)
         nnup7 = self.relu(self.bn_nnup7(self.nnup7(concat_nnup7)))
 
-        c7_1 = self.relu(self.bn_c7_1(self.conv7_1(nnup7)))
+        out = self.conv7_1(nnup7)
 
-        out = self.conv7_3(c7_1)
+        #c7_1 = self.relu(self.bn_c7_1(self.conv7_1(nnup7)))
+
+        #out = self.conv7_3(c7_1)
         
         # Split parameters
         params = torch.split(out, split_size_or_sections=1, dim=1)

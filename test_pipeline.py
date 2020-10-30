@@ -9,6 +9,7 @@ import reduced_net
 import large_net
 import matplotlib.pyplot as plt
 import numpy as np
+import gc
 import json
 from torch.utils.data.sampler import SubsetRandomSampler
 
@@ -35,6 +36,8 @@ layers = 8
 
 
 'Create folder structure'
+relative_path_to_results
+os.path.exists(relative_path_to_results) 
 if(not os.path.isdir(relative_path_to_results)):
     os.mkdir(relative_path_to_results)
     os.mkdir(relative_path_to_results + '/model')
@@ -42,6 +45,8 @@ if(not os.path.isdir(relative_path_to_results)):
     os.mkdir(relative_path_to_results + '/plots')
     os.mkdir(relative_path_to_results + '/images')
 assert os.path.isdir(relative_path_to_scenes)
+
+
 
 
 'Read all scenes and generate all ids'
@@ -122,6 +127,8 @@ for epoch in range(max_epochs):
 
         if(torch.cuda.is_available() == True):
             torch.cuda.empty_cache()
+            #del variables 
+            #gc.collect()
 
         #TODO
         #if(step>10):
