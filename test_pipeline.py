@@ -31,7 +31,7 @@ max_epochs = 250
 validation_split = .2
 val_interval = 10
 layers = 8
-image_size = (64,64)
+#image_size = (64,64)
 
 
 'Create folder structure'
@@ -119,6 +119,9 @@ for epoch in range(max_epochs):
         optimizer.step()
         epoch_loss += loss.item()
         print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
+
+        if(torch.cuda.is_available() == True):
+            torch.cuda.empty_cache()
 
         #TODO
         #if(step>10):

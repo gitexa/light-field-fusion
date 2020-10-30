@@ -321,8 +321,8 @@ def homography(mpis, input_dict):
     target_pos = input_dict['target_image_pose']
     
     #warp the first image
-    target_mpi1 = torch.zeros((4,512,512,layers))
-    target_mpi2 = torch.zeros((4,512,512,layers))
+    target_mpi1 = torch.zeros(mpi1.shape)
+    target_mpi2 = torch.zeros(mpi2.shape)
     
     camera_xDiff1 = (mpi1_pos[0]-target_pos[0])
     camera_yDiff1 = (mpi1_pos[1]-target_pos[1])
@@ -335,23 +335,16 @@ def homography(mpis, input_dict):
             
             xdisparity1 = int(((layers-1-d)*bin_size1 + min_disp1 - (1/focus_dist))*disparity_factor*camera_xDiff1)
             xdisparity2 = int(((layers-1-d)*bin_size2 + min_disp2 - (1/focus_dist))*disparity_factor*camera_xDiff2)
-            
-
         
             if xdisparity1 >0:
                 target_mpi1[:,:-xdisparity1,:,d] = mpi1[:,xdisparity1:,:,d]
             elif xdisparity1 < 0:
-                
-                
                 target_mpi1[:,-xdisparity1:,:,d] = mpi1[:,:xdisparity1,:,d]
             else:
                 target_mpi1[:,:,:,d]=mpi1[:,:,:,d]
-               
             if xdisparity2 >0:
                 target_mpi2[:,:-xdisparity2,:,d] = mpi2[:,xdisparity2:,:,d]
             elif xdisparity2 < 0:
-                
-                
                 target_mpi2[:,-xdisparity2:,:,d] = mpi2[:,:xdisparity2,:,d]
             else:
                 target_mpi2[:,:,:,d]=mpi2[:,:,:,d]
@@ -374,7 +367,6 @@ def homography(mpis, input_dict):
             if ydisparity2 >0:
                 target_mpi2[:,:,ydisparity2:,d] = mpi2[:,:,:-ydisparity2,d]
             elif ydisparity2 < 0:
-                
                 target_mpi2[:,:,:ydisparity2,d] = mpi2[:,:,-ydisparity2:,d]
             else:
                 target_mpi2[:,:,:,d]=mpi2[:,:,:,d]
