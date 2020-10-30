@@ -4,9 +4,8 @@ import dataset
 import torch 
 import processing
 import get_data
-import small_net
-import reduced_net
-import large_net
+from models.net_direct_mpi import MPIPredictionNet as MPIPredictionNet_directMPI
+from models.net_weighted_mpi import MPIPredictionNet as MPIPredictionNet_weightedMPI
 import matplotlib.pyplot as plt
 import numpy as np
 import gc
@@ -56,13 +55,14 @@ assert os.path.isdir(relative_path_to_scenes)
 #all_scenes.append('1eTVjMYXkOBq6b')
 #all_scenes.append('1eTVjMYXkOBq6b')
 all_scenes = dataset_processing.get_all_scenes(relative_path_to_scenes)
+#all_scenes = ['qPS9zDEjhwzIez']
 all_ids = dataset_processing.generate_all_ids(all_scenes)
 num_scenes = len(all_scenes)
 
 'Create PSV dataset (only once necessary)' 
 # Only once!!!
-#for scene in all_scenes:
-#    processing.create_psv_dataset(relative_path_to_scenes + '/' + scene, layers=layers)
+for scene in all_scenes:
+    processing.create_psv_dataset(relative_path_to_scenes + '/' + scene, layers=layers)
 
 'Create customized pytorch dataset'
 random_seed = 42
@@ -80,7 +80,7 @@ validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampl
 
 'Create model, loss function and optimizer'
 #model = large_net.MPIPredictionNet()
-model = reduced_net.MPIPredictionNet()
+model = MPIPredictionNet_directMPI()
 if(torch.cuda.is_available() == True):
     model.to(device)
 loss_function = torch.nn.MSELoss()

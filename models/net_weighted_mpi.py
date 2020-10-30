@@ -45,6 +45,7 @@ class MPIPredictionNet(nn.Module):
         #self.softmax = nn.Softmax(dim=4)
         self.softmax = nn.Softmax()
 
+
     def forward(self, psvs):
 
         # layern normalization
@@ -77,20 +78,31 @@ class MPIPredictionNet(nn.Module):
 
         out = self.conv7_1(nnup7)
 
-        #c7_1 = self.relu(self.bn_c7_1(self.conv7_1(nnup7)))
+        mpis = self.network_into_mpi(out, psvs)
 
-        #out = self.conv7_3(c7_1)
-        
-        # Split parameters
-        params = torch.split(out, split_size_or_sections=1, dim=1)
-        
-        # Output tensor is of dimension batch_size x parameters(5) x height x width x depth; 5 parameters: r,g,b,a,all-0
-        alpha = self.sigmoid(params[0])
-        r = self.sigmoid(params[1])
-        g = self.sigmoid(params[2])
-        b = self.sigmoid(params[3])
-
-        # Stack together
-        mpis = torch.squeeze(torch.stack((r, g, b, alpha), dim=1))
 
         return mpis
+    
+
+    def network_into_mpi(self, tensor, psvs):
+    
+        #assume tensor is shape (2, 5,512,512,8)
+        #assume psvs is shape (2,5,3,512,512)
+        
+        mpis = torch.zeros((2,4,512,512,8))
+        
+        mpis[:,0] = tensor[:,0]
+        
+        softmax_input1 = torch.stack( [torch.zeros((512,512,8)), tensor[0,1], tensor[0,2], tensor[0,3], tensor[0,4]], dim=0)
+        softmax_output1 = torch.nn.functional.softmax(softmax_input1, dim=0)
+        
+        softmax_input2 = torch.stack( [torch.zeros((512,512,8)), tensor[1,1], tensor[1,2], tensor[1,3], tensor[1,4]], dim=0)
+        softmax_output2 = torch.nn.functional.softmax(softmax_input2, dim=0)
+        
+        for d in range(8):
+            mpis[0,1:,:,:,d] = torch.sum(psvs[0,:,:,:,:] * softmax_output1[:,None,:,:,d], dim=0)
+            mpis[1,1:,:,:,d] = torch.sum(psvs[1,:,:,:,:] * softmax_output2[:,None,:,:,d], dim=0)
+                        
+        return mpis
+    
+    
