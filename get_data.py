@@ -176,7 +176,7 @@ def _get_next_line(f):
     
 def read_all_depths(data_folder, highres=False):
     params = read_parameters(data_folder)
-    all_depths = np.zeros((params["num_cams_x"], params["num_cams_y"], params["height"], params["width"]), dtype=np.uint8)
+    all_depths = np.zeros((params["num_cams_x"], params["num_cams_y"], params["height"], params["width"]), dtype=np.float)
     views = sorted([f for f in os.listdir(data_folder) if f.startswith("gt_depth_%s_" % ("highres" if highres else "lowres")) and f.endswith(".pfm")])
     
     for idx, view in enumerate(views):
