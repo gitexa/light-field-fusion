@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import gc
 import json
+import matplotlib.pyplot as plt
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
@@ -61,8 +62,8 @@ num_scenes = len(all_scenes)
 
 'Create PSV dataset (only once necessary)' 
 # Only once!!!
-for scene in all_scenes:
-    processing.create_psv_dataset(relative_path_to_scenes + '/' + scene, layers=layers)
+#for scene in all_scenes:
+#    processing.create_psv_dataset(relative_path_to_scenes + '/' + scene, layers=layers)
 
 'Create customized pytorch dataset'
 random_seed = 42
@@ -81,6 +82,7 @@ validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampl
 'Create model, loss function and optimizer'
 #model = large_net.MPIPredictionNet()
 model = MPIPredictionNet_directMPI()
+#model = MPIPredictionNet_weightedMPI(device)
 if(torch.cuda.is_available() == True):
     model.to(device)
 loss_function = torch.nn.MSELoss()
@@ -91,6 +93,9 @@ training_epoch_loss_values = list()
 validation_epoch_loss_values = list()
 best_metric = 100 #TODO random value, to be improved
 best_metric_epoch = 0
+
+'Collect corrupted ids'
+corrupted_ids = list()
 
 'Start training process'
 print('-' * 60)
@@ -106,33 +111,56 @@ for epoch in range(max_epochs):
 
     'Forward and backward in batches (batches with 2x5 PSVs are assembled inside dataloader, batch_size therefore 1'
     for data in training_generator:
-        step += 1
-        print('Sample: ' + data['sample_id'][0])
-        optimizer.zero_grad()
-        psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
-        if(torch.cuda.is_available() == True):
-            psvs, target_image = psvs.to(device), target_image.to(device)
 
-        mpis = model(psvs)
-        
-        predicted_image = processing.get_target_image(mpis, data)
-        if(torch.cuda.is_available() == True):
-            predicted_image = predicted_image.to(device)
+        # Get quick and dirty rid of errors we just discovered in the lightfield dataset
+        if((data['mpi_1_min_disp']>1/1000) or (data['mpi_2_min_disp']>1/1000)):
+            step += 1
+            print('Sample: ' + data['sample_id'][0])
+            optimizer.zero_grad()
+            psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
+            if(torch.cuda.is_available() == True):
+                psvs, target_image = psvs.to(device), target_image.to(device)
 
-        loss = loss_function(target_image, predicted_image)
-        loss.backward()
-        optimizer.step()
-        epoch_loss += loss.item()
-        print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
+            mpis = model(psvs)
+            
+            predicted_image = processing.get_target_image(mpis, data)
+            if(torch.cuda.is_available() == True):
+                predicted_image = predicted_image.to(device)
+            
+            #plt.imshow(  predicted_image.to("cpu").permute(1, 2, 0)  )
+            #plt.savefig(relative_path_to_results + '/' + 'pred.png')
 
-        if(torch.cuda.is_available() == True):
-            torch.cuda.empty_cache()
-            #del variables 
-            #gc.collect()
+            #plt.imshow(  target_image.to("cpu").detach().permute(1, 2, 0)  )
+            #plt.savefig(relative_path_to_results + '/' + 'targ.png')
 
-        #TODO
-        #if(step>10):
-        #    break
+            #model_params = list()
+            #for name, param in model.named_parameters():
+            #    model_params.append((name, param.data))
+
+            loss = loss_function(target_image, predicted_image)
+            loss.backward()
+            optimizer.step()
+
+            #model_params_after_grad = list()
+            #for name, param in model.named_parameters():
+            #    model_params_after_grad.append((name, param.data))
+            
+            #print(torch.max(model_params[0][1]-model_params_after_grad[0][1]))
+
+            epoch_loss += loss.item()
+            print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
+
+            if(torch.cuda.is_available() == True):
+                torch.cuda.empty_cache()
+                #del variables 
+                #gc.collect()
+
+        else:
+            corrupted_ids.append(data['sample_id'])
+
+            #TODO
+            #if(step>10):
+            #    break
     
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
@@ -149,20 +177,26 @@ for epoch in range(max_epochs):
             val_loss = 0
             val_step = 0
             for data in validation_generator:
-                val_step += 1
-                psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
-                if(torch.cuda.is_available() == True):
-                    psvs, target_image = psvs.to(device), target_image.to(device)
-
-                mpis = model(psvs)
-
-                predicted_image = processing.get_target_image(mpis, data)
-                if(torch.cuda.is_available() == True):
-                    predicted_image = predicted_image.to(device)
                 
-                loss = loss_function(target_image, predicted_image)
-                processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
-                val_loss += loss.item()
+                # Get quick and dirty rid of errors we just discovered in the lightfield dataset
+                if((data['mpi_1_min_disp']>1/1000) or (data['mpi_2_min_disp']>1/1000)):
+                    val_step += 1
+                    psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
+                    if(torch.cuda.is_available() == True):
+                        psvs, target_image = psvs.to(device), target_image.to(device)
+
+                    mpis = model(psvs)
+
+                    predicted_image = processing.get_target_image(mpis, data)
+                    if(torch.cuda.is_available() == True):
+                        predicted_image = predicted_image.to(device)
+                    
+                    loss = loss_function(target_image, predicted_image)
+                    processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
+                    val_loss += loss.item()
+                
+                else:
+                    pass
 
                 #TODO
                 #if(val_step>10):
@@ -184,12 +218,15 @@ for epoch in range(max_epochs):
     if (epoch == 0):
         torch.save(model.state_dict(), relative_path_to_results + '/model/epoch_'+ str(epoch) +'_best_metric_model.pth')
         print('Saved model after one epoch for testing')
+    
+    'Save metrics'
+    with open(relative_path_to_results + '/metrics/' + 'training_epoch_loss_values.txt', 'w') as filehandle:
+        json.dump(training_epoch_loss_values, filehandle)
+    with open(relative_path_to_results + '/metrics/' + 'validation_epoch_loss_values.txt', 'w') as filehandle:
+        json.dump(validation_epoch_loss_values, filehandle)
+    with open(relative_path_to_results + '/currupted_ids.txt', 'w') as filehandle:
+        json.dump(corrupted_ids, filehandle)
 
-'Save metrics'
-with open(relative_path_to_results + '/metrics/' + 'training_epoch_loss_values.txt', 'w') as filehandle:
-    json.dump(training_epoch_loss_values, filehandle)
-with open(relative_path_to_results + '/metrics/' + 'validation_epoch_loss_values.txt', 'w') as filehandle:
-    json.dump(validation_epoch_loss_values, filehandle)
 
 'Save plot of metrics'
 plt.figure('train', (12, 6))
