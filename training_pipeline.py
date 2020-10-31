@@ -112,55 +112,57 @@ for epoch in range(max_epochs):
     'Forward and backward in batches (batches with 2x5 PSVs are assembled inside dataloader, batch_size therefore 1'
     for data in training_generator:
 
-        # Get quick and dirty rid of errors we just discovered in the lightfield dataset
-        if((data['mpi_1_min_disp']>1/1000) or (data['mpi_2_min_disp']>1/1000)):
-            step += 1
-            print('Sample: ' + data['sample_id'][0])
-            optimizer.zero_grad()
-            psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
-            if(torch.cuda.is_available() == True):
-                psvs, target_image = psvs.to(device), target_image.to(device)
+        with torch.autograd.set_detect_anomaly(True):
 
-            mpis = model(psvs)
-            
-            predicted_image = processing.get_target_image(mpis, data)
-            if(torch.cuda.is_available() == True):
-                predicted_image = predicted_image.to(device)
-            
-            #plt.imshow(  predicted_image.to("cpu").permute(1, 2, 0)  )
-            #plt.savefig(relative_path_to_results + '/' + 'pred.png')
+            # Get quick and dirty rid of errors we just discovered in the lightfield dataset
+            if((data['mpi_1_min_disp']>1/1000) or (data['mpi_2_min_disp']>1/1000)):
+                step += 1
+                print('Sample: ' + data['sample_id'][0])
+                optimizer.zero_grad()
+                psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
+                if(torch.cuda.is_available() == True):
+                    psvs, target_image = psvs.to(device), target_image.to(device)
 
-            #plt.imshow(  target_image.to("cpu").detach().permute(1, 2, 0)  )
-            #plt.savefig(relative_path_to_results + '/' + 'targ.png')
+                mpis = model(psvs)
+                
+                predicted_image = processing.get_target_image(mpis, data)
+                if(torch.cuda.is_available() == True):
+                    predicted_image = predicted_image.to(device)
+                
+                #plt.imshow(  predicted_image.to("cpu").permute(1, 2, 0)  )
+                #plt.savefig(relative_path_to_results + '/' + 'pred.png')
 
-            #model_params = list()
-            #for name, param in model.named_parameters():
-            #    model_params.append((name, param.data))
+                #plt.imshow(  target_image.to("cpu").detach().permute(1, 2, 0)  )
+                #plt.savefig(relative_path_to_results + '/' + 'targ.png')
 
-            loss = loss_function(target_image, predicted_image)
-            loss.backward()
-            optimizer.step()
+                #model_params = list()
+                #for name, param in model.named_parameters():
+                #    model_params.append((name, param.data))
 
-            #model_params_after_grad = list()
-            #for name, param in model.named_parameters():
-            #    model_params_after_grad.append((name, param.data))
-            
-            #print(torch.max(model_params[0][1]-model_params_after_grad[0][1]))
+                loss = loss_function(target_image, predicted_image)
+                loss.backward()
+                optimizer.step()
 
-            epoch_loss += loss.item()
-            print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
+                #model_params_after_grad = list()
+                #for name, param in model.named_parameters():
+                #    model_params_after_grad.append((name, param.data))
+                
+                #print(torch.max(model_params[0][1]-model_params_after_grad[0][1]))
 
-            if(torch.cuda.is_available() == True):
-                torch.cuda.empty_cache()
-                #del variables 
-                #gc.collect()
+                epoch_loss += loss.item()
+                print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
 
-        else:
-            corrupted_ids.append(data['sample_id'])
+                if(torch.cuda.is_available() == True):
+                    torch.cuda.empty_cache()
+                    #del variables 
+                    #gc.collect()
 
-            #TODO
-            #if(step>10):
-            #    break
+            else:
+                corrupted_ids.append(data['sample_id'])
+
+                #TODO
+                #if(step>10):
+                #    break
     
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
@@ -177,30 +179,30 @@ for epoch in range(max_epochs):
             val_loss = 0
             val_step = 0
             for data in validation_generator:
-                
-                # Get quick and dirty rid of errors we just discovered in the lightfield dataset
-                if((data['mpi_1_min_disp']>1/1000) or (data['mpi_2_min_disp']>1/1000)):
-                    val_step += 1
-                    psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
-                    if(torch.cuda.is_available() == True):
-                        psvs, target_image = psvs.to(device), target_image.to(device)
+                with torch.autograd.set_detect_anomaly(True):
+                    # Get quick and dirty rid of errors we just discovered in the lightfield dataset
+                    if((data['mpi_1_min_disp']>1/1000) or (data['mpi_2_min_disp']>1/1000)):
+                        val_step += 1
+                        psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
+                        if(torch.cuda.is_available() == True):
+                            psvs, target_image = psvs.to(device), target_image.to(device)
 
-                    mpis = model(psvs)
+                        mpis = model(psvs)
 
-                    predicted_image = processing.get_target_image(mpis, data)
-                    if(torch.cuda.is_available() == True):
-                        predicted_image = predicted_image.to(device)
+                        predicted_image = processing.get_target_image(mpis, data)
+                        if(torch.cuda.is_available() == True):
+                            predicted_image = predicted_image.to(device)
+                        
+                        loss = loss_function(target_image, predicted_image)
+                        processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
+                        val_loss += loss.item()
                     
-                    loss = loss_function(target_image, predicted_image)
-                    processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
-                    val_loss += loss.item()
-                
-                else:
-                    pass
+                    else:
+                        pass
 
-                #TODO
-                #if(val_step>10):
-                #    break
+                    #TODO
+                    #if(val_step>10):
+                    #    break
             val_loss /= val_step
             validation_epoch_loss_values.append((epoch, val_loss))
 
