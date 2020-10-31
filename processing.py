@@ -244,12 +244,12 @@ def back_to_front_alphacomposite(rgba_depth_image):
         
         layer = rgba_depth_image[:,:,:,d-1]
 
-        img[:-1,:,:] = layer[-1][None,:,:]*layer[:-1,:,:]+img[-1][None,:,:]*img[:-1,:,:]*(1-layer[-1][None,:,:])
+        
 
-        img[-1,:,:] = layer[-1,:,:]+img[-1,:,:]*(1-layer[-1,:,:])+1e-10
-
-        img[:-1,:,:] = img[:-1,:,:] / img[-1][None,:,:]
-
+        img[-1,:,:] = layer[-1,:,:]+img[-1,:,:]*(1-layer[-1,:,:]) + 1e-10
+        img[:-1,:,:] = torch.stack([(layer[-1]*layer[0,:,:]+img[-1]*img[0,:,:]*(1-layer[-1]))/img[-1],
+                                    (layer[-1]*layer[1,:,:]+img[-1]*img[1,:,:]*(1-layer[-1]))/img[-1], 
+                                    (layer[-1]*layer[2,:,:]+img[-1]*img[2,:,:]*(1-layer[-1]))/img[-1]], dim=0)
 
     return img
 
