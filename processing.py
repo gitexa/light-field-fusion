@@ -464,14 +464,14 @@ def save_images(relative_path_to_results, target_image, predicted_target_image, 
         
 
 # die gute    
-def network_into_mpi(tensor, psvs):
+def network_into_mpi(tensor, psvs, device):
     
     #assume tensor is shape (2, 5,512,512,8)
     #assume psvs is shape (2,5,3,512,512,8)
 
 
-    softmax_input = torch.stack([torch.stack([torch.zeros((512,512,8)), tensor[0,1], tensor[0,2], tensor[0,3], tensor[0,4]],dim=0),
-                                 torch.stack([torch.zeros((512,512,8)), tensor[1,1], tensor[1,2], tensor[1,3], tensor[1,4]],dim=0)] ,dim=0)
+    softmax_input = torch.stack([torch.stack([torch.zeros((512,512,8)).to(device), tensor[0,1], tensor[0,2], tensor[0,3], tensor[0,4]],dim=0),
+                                 torch.stack([torch.zeros((512,512,8)).to(device), tensor[1,1], tensor[1,2], tensor[1,3], tensor[1,4]],dim=0)] ,dim=0)
     softmax_output = torch.nn.functional.softmax(softmax_input, dim=1)
 
     r = torch.sum(psvs[:,:,0,:,:,:]*softmax_output, dim=1)

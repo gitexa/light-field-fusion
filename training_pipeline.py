@@ -83,8 +83,8 @@ validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampl
 
 'Create model, loss function and optimizer'
 #model = large_net.MPIPredictionNet()
-model = MPIPredictionNet_directMPI()
-#model = MPIPredictionNet_weightedMPI(device)
+#model = MPIPredictionNet_directMPI()
+model = MPIPredictionNet_weightedMPI(device)
 if(torch.cuda.is_available() == True):
     model.to(device)
 loss_function = torch.nn.MSELoss()
@@ -165,7 +165,7 @@ for epoch in range(max_epochs):
                 #TODO
                 #if(step>10):
                 #    break
-                
+
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
     print('-' * 10)

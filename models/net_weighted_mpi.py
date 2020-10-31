@@ -1,6 +1,7 @@
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F
+from processing import network_into_mpi
 
 
 class MPIPredictionNet(nn.Module):
@@ -80,8 +81,8 @@ class MPIPredictionNet(nn.Module):
 
         out = self.conv7_1(nnup7)
 
-        mpis = self.network_into_mpi(out, psvs)
-
+        #mpis = self.network_into_mpi(out, psvs)
+        mpis = network_into_mpi(out, torch.reshape(psvs, (2,5,3,512,512,8)), self.device)
 
         return mpis
     
