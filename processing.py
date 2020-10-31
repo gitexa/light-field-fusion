@@ -237,6 +237,28 @@ def back_to_front_alphacomposite(rgba_depth_image):
     mpiR_alpha = rgba_depth_image[..., 3:4] # 1 H W D 1
     mpiR_color = rgba_depth_image[..., 0:3] # 1 H W D 3
     
+    img = rgba_depth_image[:,:,:,-1]
+
+
+    for d in reversed(range(1,Depth)):
+        
+        layer = rgba_depth_image[:,:,:,d-1]
+
+        img[:-1,:,:] = layer[-1][None,:,:]*layer[:-1,:,:]+img[-1][None,:,:]*img[:-1,:,:]*(1-layer[-1][None,:,:])
+
+        img[-1,:,:] = layer[-1,:,:]+img[-1,:,:]*(1-layer[-1,:,:])
+
+        img[:-1,:,:] = img[:-1,:,:] / img[-1][None,:,:].clamp(min=0.0001)
+
+
+    return img
+
+def back_to_front_alphacomposite_pillow(rgba_depth_image):
+    
+    assert len(rgba_depth_image.shape)==4 , 'Input image needs to have shape 4 x 512 x 512 x Depth'
+    assert rgba_depth_image.shape[0] == 4 , 'Input image needs to have shape 4 x 512 x 512 x Depth'
+    Depth = rgba_depth_image.shape[3] 
+    
     img = transforms.ToPILImage('RGBA')(rgba_depth_image[:,:,:,-1])
 
     for d in reversed(range(1,Depth)):
