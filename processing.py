@@ -481,7 +481,7 @@ def network_into_mpi(tensor, psvs):
     b = torch.sum(psvs[:,:,2,:,:,:]*softmax_output, dim=1)
 
    
-    mpis = torch.stack( [r,g,b, tensor[:,3]], dim=1)
+    mpis = torch.stack( [r,g,b, tensor[:,0]], dim=1)
                        
     return mpis
 
@@ -506,7 +506,7 @@ def network_into_mpi2(tensor, psvs):
     g2 = torch.sum(psvs[1,:,1,:,:,:]*softmax_output2, dim=0)
     b2 = torch.sum(psvs[1,:,2,:,:,:]*softmax_output2, dim=0)
     
-    mpis = torch.stack( [torch.stack([r1,g1,b1,tensor[0,3]], dim=0), torch.stack([r2,g2,b2,tensor[1,3]], dim=0)], dim=0)
+    mpis = torch.stack( [torch.stack([r1,g1,b1,tensor[0,0]], dim=0), torch.stack([r2,g2,b2,tensor[1,0]], dim=0)], dim=0)
                        
     return mpis
      
