@@ -233,6 +233,9 @@ def back_to_front_alphacomposite(rgba_depth_image):
     assert len(rgba_depth_image.shape)==4 , 'Input image needs to have shape 4 x 512 x 512 x Depth'
     assert rgba_depth_image.shape[0] == 4 , 'Input image needs to have shape 4 x 512 x 512 x Depth'
     Depth = rgba_depth_image.shape[3] 
+
+    mpiR_alpha = rgba_depth_image[..., 3:4] # 1 H W D 1
+    mpiR_color = rgba_depth_image[..., 0:3] # 1 H W D 3
     
     img = transforms.ToPILImage('RGBA')(rgba_depth_image[:,:,:,-1])
 
