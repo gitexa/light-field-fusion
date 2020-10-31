@@ -243,9 +243,9 @@ def back_to_front_alphacomposite(rgba_depth_image):
 
         img[:-1,:,:] = layer[-1][None,:,:]*layer[:-1,:,:]+img[-1][None,:,:]*img[:-1,:,:]*(1-layer[-1][None,:,:])
 
-        img[-1,:,:] = layer[-1,:,:]+img[-1,:,:]*(1-layer[-1,:,:])
+        img[-1,:,:] = layer[-1,:,:]+img[-1,:,:]*(1-layer[-1,:,:])+0.00000001
 
-        img[:-1,:,:] = img[:-1,:,:] / img[-1][None,:,:].clamp(min=0.0001)
+        img[:-1,:,:] = img[:-1,:,:] / img[-1][None,:,:]
 
 
     return img
