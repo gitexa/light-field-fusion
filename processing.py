@@ -243,8 +243,6 @@ def back_to_front_alphacomposite(rgba_depth_image):
         
         layer = rgba_depth_image[:,:,:,d-1]
 
-        
-
         alpha_new = layer[-1]+img[-1]*(1-layer[-1]) + 1e-10
         r_new     = (layer[-1]*layer[0]+img[-1]*img[0]*(1-layer[-1]))/alpha_new
         g_new     = (layer[-1]*layer[1]+img[-1]*img[1]*(1-layer[-1]))/alpha_new

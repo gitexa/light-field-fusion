@@ -23,6 +23,8 @@ if(torch.cuda.is_available() == True):
     device = torch.device('cuda:0')
 else:
     device = torch.device('cpu')
+torch.manual_seed(0)
+np.random.seed(0)
 
 'Parameters'
 #torch.manual_seed(0)
@@ -163,7 +165,7 @@ for epoch in range(max_epochs):
                 #TODO
                 #if(step>10):
                 #    break
-    
+                
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
     print('-' * 10)
@@ -183,6 +185,7 @@ for epoch in range(max_epochs):
                     # Get quick and dirty rid of errors we just discovered in the lightfield dataset
                     if((data['mpi_1_min_disp']>1/1000) or (data['mpi_2_min_disp']>1/1000)):
                         val_step += 1
+                        print('Sample: ' + data['sample_id'][0])
                         psvs, target_image = torch.squeeze(data['psvs']), torch.squeeze(data['target_image'])
                         if(torch.cuda.is_available() == True):
                             psvs, target_image = psvs.to(device), target_image.to(device)
@@ -196,6 +199,7 @@ for epoch in range(max_epochs):
                         loss = loss_function(target_image, predicted_image)
                         processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
                         val_loss += loss.item()
+                        print(f"{val_step}/{len(val_indices) // validation_generator.batch_size}, val_loss: {loss.item():.4f}")
                     
                     else:
                         pass
