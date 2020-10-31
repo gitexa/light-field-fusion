@@ -252,6 +252,32 @@ def back_to_front_alphacomposite(rgba_depth_image):
 
     return img
 
+def back_to_front_alphacomposite_clone(rgba_depth_image):
+    
+    assert len(rgba_depth_image.shape)==4 , 'Input image needs to have shape 4 x 512 x 512 x Depth'
+    assert rgba_depth_image.shape[0] == 4 , 'Input image needs to have shape 4 x 512 x 512 x Depth'
+    Depth = rgba_depth_image.shape[3] 
+    
+    img = rgba_depth_image[:,:,:,-1].clone()
+
+
+    for d in reversed(range(1,Depth)):
+        
+        layer = rgba_depth_image[:,:,:,d-1]
+
+        
+
+        alpha_new = layer[-1]+img[-1]*(1-layer[-1]) + 1e-10
+        r_new     = (layer[-1]*layer[0]+img[-1]*img[0]*(1-layer[-1]))/alpha_new
+        g_new     = (layer[-1]*layer[1]+img[-1]*img[1]*(1-layer[-1]))/alpha_new
+        b_new     = (layer[-1]*layer[2]+img[-1]*img[2]*(1-layer[-1]))/alpha_new
+                                  
+       
+        img = torch.stack([r_new, g_new, b_new, alpha_new], dim=0)
+
+    return img
+
+
 def back_to_front_alphacomposite_pillow(rgba_depth_image):
     
     assert len(rgba_depth_image.shape)==4 , 'Input image needs to have shape 4 x 512 x 512 x Depth'
