@@ -86,7 +86,7 @@ class MPIPredictionNet(nn.Module):
 
         return mpis
     
-
+    '''
     def network_into_mpi(self, tensor, psvs):
     
         #assume tensor is shape (2, 5,512,512,8)
@@ -109,5 +109,4 @@ class MPIPredictionNet(nn.Module):
             mpis[1,1:,:,:,d] = torch.sum(psvs[1,:,:,:,:] * softmax_output2[:,None,:,:,d], dim=0)
                         
         return mpis
-    
-    
+    '''
