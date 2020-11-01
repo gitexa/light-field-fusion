@@ -221,6 +221,24 @@ def rgba(image, depth_tensor):
                 
     return output
     
+def rgba_center_psv(psv):
+
+    # PSV dimension (2,3,512,512,depth)
+    alpha = torch.zeros((2,1,512,512,8))
+    height = 512
+    depth = 512
+    height = 8
+    for h in range(height):
+        for w in range(width): 
+            for d in range(depth):
+                if (psv_r[:,0,h,w,d] > 0):
+                    alpha[:,0,h,w,d] = 1
+    
+    rgba = torch.stack((psvs, alpha), dim=1)
+
+    return rgba
+
+    
     
     
     
@@ -509,7 +527,7 @@ def network_into_mpi2(tensor, psvs):
     g2 = torch.sum(psvs[1,:,1,:,:,:]*softmax_output2, dim=0)
     b2 = torch.sum(psvs[1,:,2,:,:,:]*softmax_output2, dim=0)
     
-    mpis = torch.stack( [torch.stack([r1,g1,b1,torch.sigmoid(tensor[0,0]) dim=0), torch.stack([r2,g2,b2,torch.sigmoid(tensor[1,0])], dim=0)], dim=0)
+    mpis = torch.stack( [torch.stack([r1,g1,b1,torch.sigmoid(tensor[0,0])], dim=0), torch.stack([r2,g2,b2,torch.sigmoid(tensor[1,0])], dim=0)], dim=0)
                        
     return mpis
      
