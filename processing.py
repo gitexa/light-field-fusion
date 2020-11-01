@@ -478,14 +478,8 @@ def network_into_mpi(tensor, psvs, device):
     g = torch.sum(psvs[:,:,1,:,:,:]*softmax_output, dim=1)
     b = torch.sum(psvs[:,:,2,:,:,:]*softmax_output, dim=1)
 
-   
-    mpis = torch.stack( [r,g,b, torch.nn.functional.sigmoid(tensor[:,0])], dim=1)
-    print('Network_prediction max: ' + str(torch.max(tensor)))
-    print('PSV max: ' + str(torch.max(psvs)))
-    print('Softmax_in max' + str(torch.max(softmax_input)))
-    print('Softmax_out max: ' + str(torch.max(softmax_output)))
-    print('MPI max: ' + str(torch.max(mpis)))
-                       
+    mpis = torch.stack( [r,g,b, torch.sigmoid(tensor[:,0])], dim=1)
+
     return mpis
 
 # äquivalent zur ersten, etwas langsamer

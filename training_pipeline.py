@@ -165,6 +165,8 @@ for epoch in range(max_epochs):
                 #TODO
                 #if(step>10):
                 #    break
+            
+            #break
 
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
@@ -207,6 +209,7 @@ for epoch in range(max_epochs):
                     #TODO
                     #if(val_step>10):
                     #    break
+                    #break 
             val_loss /= val_step
             validation_epoch_loss_values.append((epoch, val_loss))
 
