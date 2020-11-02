@@ -24,7 +24,7 @@ def get_all_scenes(path):
 
 def parse_camsnumbering2coordinates(number):
 
-    int_num = 51
+    #int_num = 51
     int_num = int(number)
     column = int(int_num % 9)
     row = int((int_num - column)/9)
@@ -207,7 +207,7 @@ def load_config_from_disk(path_to_data, scene_dir):
 
 def get_target_image_from_disk(path_to_data, scene_dir, target_image_coords):
     
-    path = path_to_data + '/' + scene_dir + '/' + 'input_Cam0' + coords2string(target_image_coords) +'.png' 
+    path = path_to_data + '/' + scene_dir + '/' + 'input_Cam' + parse_coordinates2camsnumbering(target_image_coords) +'.png' 
     pil_image = Image.open(path)
     #pil_image = pil_image.resize((128, 128))
     #TODO implement resizing operation 
