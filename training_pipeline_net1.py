@@ -3,6 +3,7 @@ import dataset_processing
 import dataset
 import torch 
 import processing
+import RandomSampler
 import get_data
 from models.net_direct_mpi import MPIPredictionNet as MPIPredictionNet_directMPI
 from models.net_weighted_mpi import MPIPredictionNet as MPIPredictionNet_weightedMPI
@@ -28,7 +29,7 @@ np.random.seed(0)
 
 'Parameters'
 #torch.manual_seed(0)
-relative_path_to_results = 'results'
+relative_path_to_results = 'results_approach1'
 relative_path_to_scenes = '/media/mkg/Elements/03_MLData/lightfields/all_lightfields'
 max_epochs = 250
 validation_split = .2
@@ -76,15 +77,17 @@ split = int(np.floor(validation_split * all_data_size))
 np.random.seed(random_seed)
 np.random.shuffle(indices)
 train_indices, val_indices = indices[split:], indices[:split]
+#train_sampler = RandomSampler.RandomSampler(train_indices)
+#valid_sampler = RandomSampler.RandomSampler(val_indices)
 train_sampler = SubsetRandomSampler(train_indices)
 valid_sampler = SubsetRandomSampler(val_indices)
-training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
+training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=train_sampler)
 validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
 
 'Create model, loss function and optimizer'
 #model = large_net.MPIPredictionNet()
-#model = MPIPredictionNet_directMPI()
-model = MPIPredictionNet_weightedMPI(device)
+model = MPIPredictionNet_directMPI()
+#model = MPIPredictionNet_weightedMPI(device)
 if(torch.cuda.is_available() == True):
     model.to(device)
 loss_function = torch.nn.MSELoss()
@@ -152,7 +155,7 @@ for epoch in range(max_epochs):
                 #print(torch.max(model_params[0][1]-model_params_after_grad[0][1]))
 
                 epoch_loss += loss.item()
-                print(f"{step}/{len(train_indices) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
+                print(f"{step}/{len(training_generator) // training_generator.batch_size}, train_loss: {loss.item():.4f}")
 
                 if(torch.cuda.is_available() == True):
                     torch.cuda.empty_cache()
@@ -201,7 +204,7 @@ for epoch in range(max_epochs):
                         loss = loss_function(target_image, predicted_image)
                         processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), epoch, loss.item())
                         val_loss += loss.item()
-                        print(f"{val_step}/{len(val_indices) // validation_generator.batch_size}, val_loss: {loss.item():.4f}")
+                        print(f"{val_step}/{len(validation_generator) // validation_generator.batch_size}, val_loss: {loss.item():.4f}")
                     
                     else:
                         pass

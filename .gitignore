@@ -1,5 +1,6 @@
 __pycache__/
 venv/
+archive/
 less_data/
 results/
 .vscode

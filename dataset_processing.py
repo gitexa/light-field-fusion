@@ -7,6 +7,9 @@ import torchvision.transforms as transforms
 
 'Helper Methods'
 def get_all_scenes(path):
+
+    print('-' * 60)
+    print('Getting all scenes ready')
     
     scenes = os.listdir(path)
     all_scenes = list()
@@ -213,6 +216,6 @@ def get_target_image_from_disk(path_to_data, scene_dir, target_image_coords):
     #TODO implement resizing operation 
     pil2tensor = transforms.ToTensor()
     rgb_image = torch.squeeze(pil2tensor(pil_image))
-    rgb_image.requires_grad = True
+    #rgb_image.requires_grad = True
 
     return rgb_image

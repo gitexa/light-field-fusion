@@ -3,6 +3,7 @@ import dataset_processing
 import dataset
 import torch 
 import processing
+import RandomSampler
 import get_data
 from models.net_direct_mpi import MPIPredictionNet as MPIPredictionNet_directMPI
 from models.net_weighted_mpi import MPIPredictionNet as MPIPredictionNet_weightedMPI
@@ -28,9 +29,9 @@ np.random.seed(0)
 
 'Parameters'
 #torch.manual_seed(0)
-relative_path_to_results = 'results'
-#relative_path_to_scenes = '/media/mkg/Elements/03_MLData/lightfields/all_lightfields'
-relative_path_to_scenes = '/media/alexander/Elements/03_MLData/lightfields/all_lightfields'
+relative_path_to_results = 'results_approach1'
+relative_path_to_scenes = '/media/mkg/Elements/03_MLData/lightfields/all_lightfields'
+#relative_path_to_scenes = '/media/alexander/Elements/03_MLData/lightfields/all_lightfields'
 validation_split = .2
 layers = 8
 
@@ -52,8 +53,8 @@ assert os.path.isdir(relative_path_to_scenes)
 #all_scenes.append('0cC7GPRFAIvP5i')
 #all_scenes.append('1eTVjMYXkOBq6b')
 #all_scenes.append('1eTVjMYXkOBq6b')
-#all_scenes = dataset_processing.get_all_scenes(relative_path_to_scenes)
-all_scenes = ['gZ392ME3DDQPeX']
+all_scenes = dataset_processing.get_all_scenes(relative_path_to_scenes)
+#all_scenes = ['gZ392ME3DDQPeX']
 all_ids = dataset_processing.generate_all_ids(all_scenes)
 num_scenes = len(all_scenes)
 
@@ -68,13 +69,15 @@ all_data = dataset.Dataset(all_ids, relative_path_to_scenes, layers)
 all_data_size = len(all_data)
 indices = list(range(all_data_size))
 split = int(np.floor(validation_split * all_data_size))
-np.random.seed(random_seed)
+#np.random.seed(random_seed)
 np.random.shuffle(indices)
 train_indices, val_indices = indices[split:], indices[:split]
-train_sampler = SubsetRandomSampler(train_indices)
-valid_sampler = SubsetRandomSampler(val_indices)
-training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
-validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
+train_sampler = RandomSampler.RandomSampler(train_indices)
+valid_sampler = RandomSampler.RandomSampler(val_indices)
+#train_sampler = SubsetRandomSampler(train_indices)
+#valid_sampler = SubsetRandomSampler(val_indices)
+training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=train_sampler, num_workers=10)
+validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler, num_workers=10)
 
 'Create loss function'
 loss_function = torch.nn.MSELoss()
@@ -140,7 +143,7 @@ for data in validation_generator:
     processing.save_images(relative_path_to_results, target_image, predicted_image, data['sample_id'][0], dataset_processing.coords2string((data['target_image_pose'][0].item(), data['target_image_pose'][1].item())), 0, loss.item())
     val_loss += loss.item()
 
-    print(f"{val_step}/{len(val_indices) // validation_generator.batch_size}, val_loss: {loss.item():.4f}")
+    print(f"{val_step}/{len(validation_generator) // validation_generator.batch_size}, val_loss: {loss.item():.4f}")
 
    
 val_loss /= val_step
