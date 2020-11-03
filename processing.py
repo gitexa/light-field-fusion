@@ -524,9 +524,15 @@ def network_into_mpi2(tensor, psvs):
     mpis = torch.stack( [torch.stack([r1,g1,b1,torch.sigmoid(tensor[0,0])], dim=0), torch.stack([r2,g2,b2,torch.sigmoid(tensor[1,0])], dim=0)], dim=0)
                        
     return mpis
-     
+
+def save_ckp(state, path):
+    torch.save(state, path)
     
-    
+def load_ckp(path, model, optimizer):
+    checkpoint = torch.load(path)
+    model.load_state_dict(checkpoint['state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    return model, optimizer, checkpoint['epoch']
     
     
     

@@ -58,8 +58,8 @@ assert os.path.isdir(relative_path_to_scenes)
 #all_scenes.append('0cC7GPRFAIvP5i')
 #all_scenes.append('1eTVjMYXkOBq6b')
 #all_scenes.append('1eTVjMYXkOBq6b')
-all_scenes = dataset_processing.get_all_scenes(relative_path_to_scenes)
-#all_scenes = ['qPS9zDEjhwzIez']
+#all_scenes = dataset_processing.get_all_scenes(relative_path_to_scenes)
+all_scenes = ['qPS9zDEjhwzIez']
 all_ids = dataset_processing.generate_all_ids(all_scenes)
 num_scenes = len(all_scenes)
 
@@ -96,6 +96,8 @@ optimizer = torch.optim.Adam(model.parameters(),lr=2e-4, amsgrad=True)
 'Loss for training and validation'
 training_epoch_loss_values = list()
 validation_epoch_loss_values = list()
+best_training_metric = 100
+best_training_metric_epoch = 0
 best_metric = 100 #TODO random value, to be improved
 best_metric_epoch = 0
 
@@ -171,14 +173,30 @@ for epoch in range(max_epochs):
             
             #break
 
+
     epoch_loss /= step
     training_epoch_loss_values.append((epoch, epoch_loss))
     print('-' * 10)
     print(f"Summary | Training | Epoch {epoch + 1}/{max_epochs} | Average loss {epoch_loss:.4f}")
 
+    if(epoch_loss<best_training_metric):
+
+        best_training_metric = epoch_loss
+        best_training_metric_epoch = epoch
+
+        checkpoint = {
+            'epoch': epoch,
+            'state_dict': model.state_dict(),
+            'optimizer': optimizer.state_dict()
+        }
+
+        processing.save_ckp(checkpoint, relative_path_to_results + '/model/epoch_'+ str((epoch)) +'training_best_metric_model.pth')
+        
+        print('Saved new best metric model in training.')
+
 
     'Validate for every val_interval epoch'
-    if (epoch + 1) % val_interval == 0:
+    if (epoch == 0) or ((epoch + 1) % val_interval == 0):
         model.eval()
         with torch.no_grad():
             print('-' * 60)
@@ -213,23 +231,36 @@ for epoch in range(max_epochs):
                     #if(val_step>10):
                     #    break
                     #break 
+            
             val_loss /= val_step
             validation_epoch_loss_values.append((epoch, val_loss))
 
             if(val_loss<best_metric):
+
                 best_metric = val_loss
                 best_metric_epoch = epoch
-                torch.save(model.state_dict(), relative_path_to_results + '/model/epoch_'+ str(epoch) +'_best_metric_model.pth')
-                print('Saved new best metric model')
+
+                checkpoint = {
+                    'epoch': epoch,
+                    'state_dict': model.state_dict(),
+                    'optimizer': optimizer.state_dict()
+                }
+
+                processing.save_ckp(checkpoint, relative_path_to_results + '/model/epoch_'+ str(epoch) +'validation_best_metric_model.pth')
+                
+                
+                #torch.save(model.state_dict(), relative_path_to_results + '/model/epoch_'+ str(epoch) +'_best_metric_model.pth')
+
+                print('Saved new best metric model in validation.')
                     
 
             print(f"Summary | Validation | Epoch {epoch + 1}/{max_epochs} | Average loss {val_loss:.4f}")
             print("All metrics and images saved")
             print(f"Current metric {val_loss:.4f} | Best metric {best_metric:.4f} (Epoch {best_metric_epoch + 1}/{max_epochs})")
 
-    if (epoch == 0):
-        torch.save(model.state_dict(), relative_path_to_results + '/model/epoch_'+ str(epoch) +'_best_metric_model.pth')
-        print('Saved model after one epoch for testing')
+    #if (epoch == 0):
+    #    torch.save(model.state_dict(), relative_path_to_results + '/model/epoch_'+ str(epoch) +'_best_metric_model.pth')
+    #    print('Saved model after one epoch for testing')
     
     'Save metrics'
     with open(relative_path_to_results + '/metrics/' + 'training_epoch_loss_values.txt', 'w') as filehandle:
