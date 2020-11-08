@@ -84,6 +84,11 @@ valid_sampler = SubsetRandomSampler(val_indices)
 training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=train_sampler)
 validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler)
 
+with open(relative_path_to_results + '/train_indices.json', 'w') as filehandle:
+    json.dump(train_indices, filehandle)
+with open(relative_path_to_results + '/val_indices.json', 'w') as filehandle:
+    json.dump(val_indices, filehandle)
+
 'Create model, loss function and optimizer'
 #model = large_net.MPIPredictionNet()
 #model = MPIPredictionNet_directMPI()

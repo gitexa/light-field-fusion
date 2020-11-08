@@ -29,7 +29,7 @@ np.random.seed(0)
 
 'Parameters'
 #torch.manual_seed(0)
-relative_path_to_results = 'results_approach1'
+relative_path_to_results = 'results_psvs'
 relative_path_to_scenes = '/media/mkg/Elements/03_MLData/lightfields/all_lightfields'
 #relative_path_to_scenes = '/media/alexander/Elements/03_MLData/lightfields/all_lightfields'
 validation_split = .2
@@ -72,10 +72,10 @@ split = int(np.floor(validation_split * all_data_size))
 #np.random.seed(random_seed)
 np.random.shuffle(indices)
 train_indices, val_indices = indices[split:], indices[:split]
-train_sampler = RandomSampler.RandomSampler(train_indices)
-valid_sampler = RandomSampler.RandomSampler(val_indices)
-#train_sampler = SubsetRandomSampler(train_indices)
-#valid_sampler = SubsetRandomSampler(val_indices)
+#train_sampler = RandomSampler.RandomSampler(train_indices)
+#valid_sampler = RandomSampler.RandomSampler(val_indices)
+train_sampler = SubsetRandomSampler(train_indices)
+valid_sampler = SubsetRandomSampler(val_indices)
 training_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=train_sampler, num_workers=10)
 validation_generator = torch.utils.data.DataLoader(all_data, batch_size=1, sampler=valid_sampler, num_workers=10)
 
