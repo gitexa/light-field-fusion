@@ -27,15 +27,19 @@ else:
 torch.manual_seed(0)
 np.random.seed(0)
 
+
 'Parameters'
 #torch.manual_seed(0)
 relative_path_to_results = 'results_approach2'
 relative_path_to_scenes = '/media/mkg/Elements/03_MLData/lightfields/all_lightfields'
+relative_path_to_checkpoint = 'results_approach2/model/epoch_3training_best_metric_model.pth'
 max_epochs = 250
 validation_split = .2
 val_interval = 5
 layers = 8
 #image_size = (64,64)
+load_checkpoint = True
+load_indices = True
 
 
 'Create folder structure'
@@ -50,8 +54,6 @@ if(not os.path.isdir(relative_path_to_results)):
 assert os.path.isdir(relative_path_to_scenes)
 
 
-
-
 'Read all scenes and generate all ids'
 #TODO add all scenes from dataset 
 #all_scenes = list()
@@ -63,20 +65,31 @@ all_scenes = dataset_processing.get_all_scenes(relative_path_to_scenes)
 all_ids = dataset_processing.generate_all_ids(all_scenes)
 num_scenes = len(all_scenes)
 
+
 'Create PSV dataset (only once necessary)' 
 # Only once!!!
 #for scene in all_scenes:
 #    processing.create_psv_dataset(relative_path_to_scenes + '/' + scene, layers=layers)
 
+
 'Create customized pytorch dataset'
-random_seed = 42
-all_data = dataset.Dataset(all_ids, relative_path_to_scenes, layers)
-all_data_size = len(all_data)
-indices = list(range(all_data_size))
-split = int(np.floor(validation_split * all_data_size))
-np.random.seed(random_seed)
-np.random.shuffle(indices)
-train_indices, val_indices = indices[split:], indices[:split]
+if (load_indices == True):
+    random_seed = 42
+    all_data = dataset.Dataset(all_ids, relative_path_to_scenes, layers)
+    with open(relative_path_to_results + '/train_indices.json') as f:
+        train_indices = json.load(f)
+    with open(relative_path_to_results + '/val_indices.json') as f:
+        val_indices = json.load(f)        
+else:
+    random_seed = 42
+    all_data = dataset.Dataset(all_ids, relative_path_to_scenes, layers)
+    all_data_size = len(all_data)
+    indices = list(range(all_data_size))
+    split = int(np.floor(validation_split * all_data_size))
+    np.random.seed(random_seed)
+    np.random.shuffle(indices)
+    train_indices, val_indices = indices[split:], indices[:split]
+
 #train_sampler = RandomSampler.RandomSampler(train_indices)
 #valid_sampler = RandomSampler.RandomSampler(val_indices)
 train_sampler = SubsetRandomSampler(train_indices)
@@ -90,21 +103,46 @@ with open(relative_path_to_results + '/val_indices.json', 'w') as filehandle:
     json.dump(val_indices, filehandle)
 
 'Create model, loss function and optimizer'
-#model = large_net.MPIPredictionNet()
-#model = MPIPredictionNet_directMPI()
-model = MPIPredictionNet_weightedMPI(device)
-if(torch.cuda.is_available() == True):
-    model.to(device)
-loss_function = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(),lr=2e-4, amsgrad=True)
+if (load_checkpoint == True):
+    # Restore model, optimizer, epoch
+    model = MPIPredictionNet_weightedMPI(device)
+    if(torch.cuda.is_available() == True):
+        model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(),lr=2e-4, amsgrad=True)
+    model_state_dict, optimizer_state_dict, epoch = processing.load_ckp(relative_path_to_checkpoint)
+    model.load_state_dict(model_state_dict)
+    optimizer.load_state_dict(optimizer_state_dict)
+    model_state_dict, optimizer_state_dict, epoch = processing.load_ckp(relative_path_to_checkpoint)
+    loss_function = torch.nn.MSELoss()
+    # Restore losses
+    with open(relative_path_to_results + '/metrics/' + 'training_epoch_loss_values.txt') as f:
+        training_epoch_loss_values = json.load(f)
+    with open(relative_path_to_results + '/metrics/' + 'validation_epoch_loss_values.txt') as f:
+        validation_epoch_loss_values = json.load(f)
+    
+    best_training_metric = min([tupl[1] for tupl in training_epoch_loss_values])
+    best_training_metric_epoch = training_epoch_loss_values[[tupl[1] for tupl in training_epoch_loss_values].index(best_training_metric)][0] # get minimum training loss and corresponding epoch
 
-'Loss for training and validation'
-training_epoch_loss_values = list()
-validation_epoch_loss_values = list()
-best_metric = 100 #TODO random value, to be improved
-best_metric_epoch = 0
-best_training_metric = 100
-best_training_metric_epoch = 0 
+    best_metric =  min([tupl[1] for tupl in validation_epoch_loss_values])
+    best_metric_epoch = validation_epoch_loss_values[[tupl[1] for tupl in validation_epoch_loss_values].index(best_metric)][0] # get minimum training loss and corresponding epoch
+
+
+else:
+    # Define models
+    #model = large_net.MPIPredictionNet()
+    #model = MPIPredictionNet_directMPI()
+    model = MPIPredictionNet_weightedMPI(device)
+    if(torch.cuda.is_available() == True):
+        model.to(device)
+    loss_function = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(),lr=2e-4, amsgrad=True)
+    # Define losses 
+    training_epoch_loss_values = list()
+    validation_epoch_loss_values = list()
+    best_metric = 100 #TODO random value, to be improved
+    best_metric_epoch = 0
+    best_training_metric = 100
+    best_training_metric_epoch = 0 
 
 'Collect corrupted ids'
 corrupted_ids = list()
@@ -112,7 +150,7 @@ corrupted_ids = list()
 'Start training process'
 print('-' * 60)
 print('Start training:')
-for epoch in range(max_epochs):
+for epoch in range(epoch, max_epochs):
     print('-' * 60)
     print(f"Training | Epoch {epoch + 1}/{max_epochs}")
     epoch_loss = 0

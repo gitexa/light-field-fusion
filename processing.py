@@ -528,11 +528,11 @@ def network_into_mpi2(tensor, psvs):
 def save_ckp(state, path):
     torch.save(state, path)
     
-def load_ckp(path, model, optimizer):
+def load_ckp(path):
     checkpoint = torch.load(path)
-    model.load_state_dict(checkpoint['state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer'])
-    return model, optimizer, checkpoint['epoch']
+    #model = model.load_state_dict(checkpoint['state_dict'])
+    #optimmizer = optimizer.load_state_dict(checkpoint['optimizer'])
+    return checkpoint['state_dict'], checkpoint['optimizer'], checkpoint['epoch']
     
     
     
